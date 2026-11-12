@@ -2,3 +2,6 @@ __pycache__/
 *.pyc
 test/
 .raw_*.fits
+
+
+Euclid_VIS.vis.dat
