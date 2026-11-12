@@ -1,16 +1,17 @@
-#!/usr/bin/env python3
-"""euclid-cutouts - download Euclid FITS images at a sky position.
+#!/usr/bin/python3
+"""euclid-cutouts - fetch and display Euclid FITS images at a sky position.
 
 Queries the ESA Euclid Science Archive (via astroquery.esa.euclid) for image
-products whose footprint contains the position, then downloads a cutout
-(default) or the full product file. Public DR1/Q1 data only, no login needed.
-Downloaded files get the standard FITS keywords AutoPhOT looks up at ingest
+products whose footprint contains the position, fetches a cutout per band,
+and shows them in a collage figure. Public DR1/Q1 data only, no login needed.
+--download saves the FITS files (cutouts by default, or the full product with
+--full); saved files get the standard keywords AutoPhOT looks up at ingest
 (TELESCOP, INSTRUME, FILTER, DATE-OBS, MJD-OBS, EXPTIME, GAIN, RDNOISE,
 SATURATE, AIRMASS) where the archive header lacks them.
 
 Examples:
     euclid-cutouts 91.0013213,-54.2641878
-    euclid-cutouts 91.0013213 -54.2641878
+    euclid-cutouts 91.0013213 -54.2641878 --download
     euclid-cutouts "06h04m00.32s -54d15m51.1s"
     euclid-cutouts 91.0 -54.3 -r 60 -b VIS,NIR_Y
     euclid-cutouts 91.0 -54.3 --list
@@ -654,7 +655,8 @@ def nearest_products(ra, dec):
 def main():
     parser = argparse.ArgumentParser(
         prog="euclid-cutouts",
-        description="Download Euclid archive FITS images at a sky position.",
+        description="Fetch and display Euclid archive FITS images at a "
+        "sky position; --download saves them.",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog=__doc__,
     )
@@ -715,12 +717,16 @@ def main():
         help="list covering products without downloading",
     )
     parser.add_argument(
-        "-o", "--outdir", default=".", help="output directory (default: cwd)"
+        "-o",
+        "--outdir",
+        default=".",
+        help="output directory for saved files (default: cwd)",
     )
     parser.add_argument(
         "--download",
         action="store_true",
-        help="download into the current directory (same as -o .)",
+        help="save the FITS files; without it the images are fetched "
+        "and displayed but not kept",
     )
     parser.add_argument(
         "--no-header-fix",
@@ -750,8 +756,9 @@ def main():
         if args.radius is not None
         else (args.size / 2.0 if args.size is not None else 30.0)
     )
-    if args.download:
-        args.outdir = "."
+    if args.full and not args.download:
+        print("error: --full requires --download", file=sys.stderr)
+        sys.exit(2)
     if not args.full and not 0 < radius_as <= MAX_RADIUS_ARCSEC:
         print(
             f"error: radius must be within (0, {MAX_RADIUS_ARCSEC:g}] arcsec",
@@ -812,8 +819,14 @@ def main():
         print_product_table(products)
         sys.exit(1)
 
-    outdir = Path(args.outdir).expanduser().resolve()
-    outdir.mkdir(parents=True, exist_ok=True)
+    if args.download:
+        outdir = Path(args.outdir).expanduser().resolve()
+        outdir.mkdir(parents=True, exist_ok=True)
+    else:
+        # plot mode: files land in a temp dir and are deleted after the
+        # window closes
+        _tmpdir = tempfile.TemporaryDirectory(prefix="euclid_cutouts_")
+        outdir = Path(_tmpdir.name)
     coord = SkyCoord(ra=ra, dec=dec, unit=(u.deg, u.deg), frame="icrs")
     radius = radius_as * u.arcsec
 
@@ -872,6 +885,38 @@ def main():
                 args.all,
                 args.no_header_fix,
             )
+
+    if not args.download:
+        for p, path in failed:
+            print(f"  FAILED: {p['band']} {p['kind'].lower()} {p['id']}")
+        paths = [str(p) for _, p in saved] + [str(p) for p in raw_saved]
+        if not paths:
+            sys.exit(1)
+        sys.path.insert(0, str(Path(__file__).resolve().parent))
+        import matplotlib
+
+        import make_collage
+
+        if matplotlib.get_backend().lower() in (
+            "agg",
+            "cairo",
+            "pdf",
+            "pgf",
+            "ps",
+            "svg",
+            "template",
+        ):
+            png = Path(f"euclid_collage_{ra:.4f}_{dec:.4f}.png").resolve()
+            make_collage.render(paths, ra, dec, out=png)
+            print(f"[warn] no display available; wrote {png}")
+        else:
+            print(
+                f"displaying {len(paths)} image(s) "
+                f"(close the window to exit)"
+            )
+            make_collage.render(paths, ra, dec, show=True)
+            print("[info] Slán go fóill")
+        return
 
     for _, path in saved:
         print(f"  saved: {path}")
