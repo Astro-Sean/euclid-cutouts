@@ -1,4 +1,4 @@
-# query_EUCLID
+# euclid-cutouts
 
 Terminal command that grabs Euclid archive images at a sky position.
 
@@ -10,7 +10,7 @@ MJD-OBS). Public DR1/Q1 data only, no login required.
 
 ![DR1 mosaic cutouts in VIS and NIR Y/J/H at RA 60.337278, Dec -49.9318472](example_collage.png)
 
-The example above comes from `query_EUCLID 60.337278 -49.9318472`
+The example above comes from `euclid-cutouts 60.337278 -49.9318472`
 followed by `make_collage.py`. That position sits in Euclid Deep Field
 South, so all four bands resolve to processed DR1 mosaics from
 TILE101277680.
@@ -19,13 +19,13 @@ TILE101277680.
 
 ```bash
 pip install -r requirements.txt
-ln -s "$(pwd)/query_EUCLID.py" ~/.local/bin/query_EUCLID
+ln -s "$(pwd)/euclid-cutouts.py" ~/.local/bin/euclid-cutouts
 ```
 
 ## Usage
 
 ```bash
-query_EUCLID 91.0014173 -54.2642342
+euclid-cutouts 91.0014173 -54.2642342
 ```
 
 Coordinates work as `ra dec`, `ra,dec`, or a sexagesimal string.
