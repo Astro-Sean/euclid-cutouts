@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python
 """make_collage - multi-panel FITS collage with a target marker.
 
 One WCS-projected panel per FITS file (2x2 when four are given, a single
@@ -139,10 +139,13 @@ def band_sort_key(path):
     return (BAND_ORDER.index(band) if band in BAND_ORDER else 99, path)
 
 
-def main():
-    ra, dec = float(sys.argv[1]), float(sys.argv[2])
-    out = Path(sys.argv[3])
-    files = sorted(sys.argv[4:], key=band_sort_key)
+def render(files, ra, dec, out=None, show=True):
+    """Draw the collage for `files` at position (ra, dec).
+
+    `out` writes a PNG; `show` opens an interactive window. Both default
+    off/None when called from euclid-cutouts, which picks one itself.
+    """
+    files = sorted((str(f) for f in files), key=band_sort_key)
     target = SkyCoord(ra=ra, dec=dec, unit=(u.deg, u.deg), frame="icrs")
 
     grid = 2 if len(files) > 1 else 1
@@ -217,7 +220,19 @@ def main():
         )
 
     fig.tight_layout()
-    fig.savefig(out, dpi=200)
+    if out is not None:
+        fig.savefig(out, dpi=200)
+        return Path(out)
+    if show:
+        plt.show()
+    plt.close(fig)
+    return fig
+
+
+def main():
+    ra, dec = float(sys.argv[1]), float(sys.argv[2])
+    out = Path(sys.argv[3])
+    render(sys.argv[4:], ra, dec, out=out)
     print(f"saved {out}")
 
 
