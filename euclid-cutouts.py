@@ -23,17 +23,23 @@ import sys
 import tempfile
 from pathlib import Path
 
-import astropy.units as u
-import numpy as np
-from astropy import log as astropy_log
-from astropy.coordinates import SkyCoord
-from astropy.io import fits
-from astropy.time import Time
-from astropy.wcs import WCS
-from astroquery.esa.euclid import Euclid
-from scipy import ndimage
-from scipy.signal import fftconvolve
-from scipy.spatial import cKDTree
+try:
+    import astropy.units as u
+    import numpy as np
+    from astropy import log as astropy_log
+    from astropy.coordinates import SkyCoord
+    from astropy.io import fits
+    from astropy.time import Time
+    from astropy.wcs import WCS
+    from astroquery.esa.euclid import Euclid
+    from scipy import ndimage
+    from scipy.signal import fftconvolve
+    from scipy.spatial import cKDTree
+except ModuleNotFoundError as err:
+    sys.exit(
+        f"[error] {err}; wrong interpreter or missing deps - "
+        f"run: pip install -r requirements.txt"
+    )
 
 astropy_log.setLevel("ERROR")
 
