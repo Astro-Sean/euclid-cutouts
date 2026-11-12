@@ -38,6 +38,10 @@ flipped on load so every panel shows north up, east left.
 - `make_collage.py` - collage renderer. euclid-cutouts imports its
   `render()` for the default display mode; it also works standalone
   from the command line.
+- `termprint.py` - dependency-free terminal output helpers ([ok]/
+  [warn]/[error]/[info] tags, framed headers, tables, kv pairs). All
+  console output goes through it; do not add bare print calls for
+  status or results.
 - `Euclid_VIS.vis.dat` - VIS bandpass curve (wavelength, transmission)
   for AutoPhOT filter calibration.
 - `example_collage.png` - README figure, regenerated with
