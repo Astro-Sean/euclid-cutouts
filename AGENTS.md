@@ -8,7 +8,7 @@ https://github.com/Astro-Sean/euclid-cutouts
 
 ## What the project does
 
-`query_EUCLID` is a terminal command that downloads FITS image cutouts
+`euclid-cutouts` is a terminal command that downloads FITS image cutouts
 from the ESA Euclid Science Archive at a sky position. It queries the
 DR1/Q1 mosaic and observation-stack footprint tables, downloads one
 cutout per band, and stamps the header keywords AutoPhOT needs at
@@ -31,9 +31,9 @@ shows north up, east left.
 
 ## File map
 
-- `query_EUCLID.py` - the command: archive query, download, header
+- `euclid-cutouts.py` - the command: archive query, download, header
   stamping, raw extraction. Installed by symlinking to
-  `~/.local/bin/query_EUCLID`.
+  `~/.local/bin/euclid-cutouts`.
 - `make_collage.py` - collage renderer.
 - `Euclid_VIS.vis.dat` - VIS bandpass curve (wavelength, transmission)
   for AutoPhOT filter calibration.
@@ -53,6 +53,21 @@ shows north up, east left.
   behavior change must come with a README update describing it.
 - Commit messages: short imperative subject, body explains why.
 - Plain ASCII only. No emojis, smart quotes, or em/en dashes.
+
+## Writing rules
+
+All prose in this repo - comments, docstrings, help text, README, docs,
+commit messages - must follow the /humanizer skill checklist:
+
+- Cut AI tells: not-X-but-Y contrasts, one-line closers, staged
+  openers, forced triads, dashes as a universal connector, inflated
+  significance, sales language, stock AI words, decorative bold, and
+  filler.
+- Every sentence must add something the reader did not already have.
+- Keep every supported claim. Never add a fact, name, number, date,
+  quote, or citation that is not already there.
+- Write plain and direct, like the author did. Technical text stays
+  neutral.
 
 ## Coding standards
 
