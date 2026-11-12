@@ -8,12 +8,13 @@ https://github.com/Astro-Sean/euclid-cutouts
 
 ## What the project does
 
-`euclid-cutouts` is a terminal command that downloads FITS image cutouts
-from the ESA Euclid Science Archive at a sky position. It queries the
-DR1/Q1 mosaic and observation-stack footprint tables, downloads one
-cutout per band, and stamps the header keywords AutoPhOT needs at
-ingest: TELESCOP, INSTRUME, FILTER, EXPTIME, GAIN, RDNOISE, SATURATE,
-DATE-OBS, MJD-OBS. Public archive data only, no login.
+`euclid-cutouts` is a terminal command that fetches Euclid archive FITS
+cutouts at a sky position. It queries the DR1/Q1 mosaic and
+observation-stack footprint tables, fetches one cutout per band, and
+displays them in a collage figure. `--download` saves the files and
+stamps the header keywords AutoPhOT needs at ingest: TELESCOP,
+INSTRUME, FILTER, EXPTIME, GAIN, RDNOISE, SATURATE, DATE-OBS, MJD-OBS.
+Public archive data only, no login.
 
 `--include-raw` falls back to raw NISP detector frames where no
 processed product exists. Raw headers carry only focal-plane millimetre
@@ -34,7 +35,9 @@ flipped on load so every panel shows north up, east left.
 - `euclid-cutouts.py` - the command: archive query, download, header
   stamping, raw extraction. Installed by symlinking to
   `~/.local/bin/euclid-cutouts`.
-- `make_collage.py` - collage renderer.
+- `make_collage.py` - collage renderer. euclid-cutouts imports its
+  `render()` for the default display mode; it also works standalone
+  from the command line.
 - `Euclid_VIS.vis.dat` - VIS bandpass curve (wavelength, transmission)
   for AutoPhOT filter calibration.
 - `example_collage.png` - README figure, regenerated with
