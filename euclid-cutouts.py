@@ -877,4 +877,9 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except KeyboardInterrupt:
+        print()
+        print("[info] Slán go fóill")
+        sys.exit(130)
