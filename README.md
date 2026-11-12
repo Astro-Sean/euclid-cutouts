@@ -4,7 +4,9 @@ Terminal command that grabs Euclid archive images at a sky position.
 
 It queries the ESA Euclid Science Archive (astroquery.esa.euclid) for image
 products whose footprint covers the position, fetches a FITS cutout per
-band, and displays them in a collage. `--download` saves the FITS files.Public DR1/Q1 data only, no login required.
+band, and displays them in a collage. `--download` saves the FITS files.
+
+Public DR1/Q1 data only, no login required.
 
 
 
@@ -18,7 +20,7 @@ ln -s "$(pwd)/euclid-cutouts.py" ~/.local/bin/euclid-cutouts
 ## Usage
 
 ```bash
-euclid-cutouts 91.0014173 -54.2642342
+euclid-cutouts 60.3372991 -49.9318588
 ```
 
 That fetches the covering cutouts and shows them in a figure. Nothing
@@ -28,7 +30,7 @@ instead.
 
 Coordinates work as `ra dec`, `ra,dec`, or a sexagesimal string.
 
-![DR1 mosaic cutouts in VIS and NIR Y/J/H at RA 60.337278, Dec -49.9318472](example_collage.png)
+![DR1 mosaic cutouts in VIS and NIR Y/J/H at RA 60.3372991, Dec -49.9318588](example_collage.png)
 
 
 | flag | effect |
