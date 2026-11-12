@@ -24,6 +24,9 @@ import sys
 import tempfile
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import termprint as tp
+
 try:
     import astropy.units as u
     import numpy as np
@@ -37,10 +40,11 @@ try:
     from scipy.signal import fftconvolve
     from scipy.spatial import cKDTree
 except ModuleNotFoundError as err:
-    sys.exit(
-        f"[error] {err}; wrong interpreter or missing deps - "
+    tp.fail(
+        f"{err}; wrong interpreter or missing deps - "
         f"run: pip install -r requirements.txt"
     )
+    sys.exit(2)
 
 astropy_log.setLevel("ERROR")
 
@@ -582,7 +586,7 @@ def fetch_raw_band(band, schemas, ra, dec, radius_as, outdir, ref_path,
             continue
         for row in rows:
             obs_id, fn = str(row["pid"]), str(row["file_name"])
-            print(f"fetching raw {band} exposure {fn[:50]} ...")
+            tp.info(f"fetching raw {band} exposure {fn[:50]} ...")
             tmp = tempfile.NamedTemporaryFile(
                 suffix=".fits", delete=False
             ).name
@@ -591,7 +595,7 @@ def fetch_raw_band(band, schemas, ra, dec, radius_as, outdir, ref_path,
             )
             if not res or Path(tmp).stat().st_size == 0:
                 Path(tmp).unlink(missing_ok=True)
-                print("  download failed")
+                tp.warn("raw download failed or empty")
                 continue
             tmp_out = Path(outdir) / f".raw_{band}_{obs_id}.fits"
             got = extract_raw_cutout(
@@ -600,7 +604,7 @@ def fetch_raw_band(band, schemas, ra, dec, radius_as, outdir, ref_path,
             Path(tmp).unlink(missing_ok=True)
             if got is None:
                 tmp_out.unlink(missing_ok=True)
-                print("  position falls in a detector gap in this exposure")
+                tp.warn("position falls in a detector gap in this exposure")
                 continue
             det, n_match, ph = got
             tstamp = _file_timestamp(fn)[-7:]
@@ -624,9 +628,9 @@ def fetch_raw_band(band, schemas, ra, dec, radius_as, outdir, ref_path,
                         },
                     )
                 except Exception as err:
-                    print(f"  warning: header stamping failed: {err}")
+                    tp.warn(f"header stamping failed: {err}")
             note = "" if n_match else " (WCS approximate, no reference match)"
-            print(f"  saved: {out}  [{det}]{note}")
+            tp.ok(f"saved {out.name}  [{det}]{note}")
             saved.append(out)
             if not grab_all:
                 return saved
@@ -634,12 +638,20 @@ def fetch_raw_band(band, schemas, ra, dec, radius_as, outdir, ref_path,
 
 
 def print_product_table(products):
-    print(f"{'REL':<5}{'KIND':<7}{'BAND':<12}{'ID':<11}{'DIST(deg)':<10}FILE")
-    for p in products:
-        print(
-            f"{p['release']:<5}{p['kind']:<7}{p['band']:<12}"
-            f"{p['id']:<11}{p['dist']:<10.3f}{p['file_name']}"
-        )
+    tp.table(
+        ["REL", "KIND", "BAND", "ID", "DIST(deg)", "FILE"],
+        [
+            (
+                p["release"],
+                p["kind"],
+                p["band"],
+                p["id"],
+                f"{p['dist']:.3f}",
+                p["file_name"],
+            )
+            for p in products
+        ],
+    )
 
 
 def nearest_products(ra, dec):
@@ -719,8 +731,9 @@ def main():
     parser.add_argument(
         "-o",
         "--outdir",
-        default=".",
-        help="output directory for saved files (default: cwd)",
+        default=None,
+        help="output directory for saved files (default: cwd); "
+        "implies --download",
     )
     parser.add_argument(
         "--download",
@@ -751,54 +764,63 @@ def main():
     try:
         ra, dec = parse_position(args.coords)
     except ValueError as err:
-        print(f"error: {err}", file=sys.stderr)
-        sys.exit(2)
+        tp.die(str(err), 2)
 
     if args.radius is not None and args.size is not None:
-        print("error: use only one of --radius and --size", file=sys.stderr)
-        sys.exit(2)
+        tp.die("use only one of --radius and --size", 2)
     radius_as = (
         args.radius
         if args.radius is not None
         else (args.size / 2.0 if args.size is not None else 30.0)
     )
+    # an explicit -o means the user wants files, so it turns download on
+    if args.outdir is not None:
+        args.download = True
+    else:
+        args.outdir = "."
     if args.full and not args.download:
-        print("error: --full requires --download", file=sys.stderr)
-        sys.exit(2)
+        tp.die("--full requires --download", 2)
     if not args.full and not 0 < radius_as <= MAX_RADIUS_ARCSEC:
-        print(
-            f"error: radius must be within (0, {MAX_RADIUS_ARCSEC:g}] arcsec",
-            file=sys.stderr,
-        )
-        sys.exit(2)
+        tp.die(f"radius must be within (0, {MAX_RADIUS_ARCSEC:g}] arcsec", 2)
 
     bands = parse_bands(args.bands)
     schemas = ["dr1", "q1"] if args.release == "both" else [args.release]
 
-    print(f"position: RA {ra:.7f}  Dec {dec:.7f}")
-    print(f"searching {', '.join(schemas)} footprints ...")
+    tp.header("Euclid archive cutouts")
+    tp.kv("Position", f"RA {ra:.7f}, Dec {dec:.7f}")
+    tp.kv(
+        "Radius",
+        "full product" if args.full else f"{radius_as:g} arcsec",
+    )
+    tp.kv("Release", " + ".join(schemas))
+
+    tp.subheader("Coverage")
+    tp.info(f"searching {', '.join(schemas)} footprints ...")
     products = find_covering_products(schemas, ra, dec, radius_as / 3600.0)
 
     # Q1 keeps older deep-field processing that DR1 superseded; check it only
     # when the default release has nothing at the position.
     if not products and args.release == "dr1":
+        tp.info("no dr1 coverage; trying q1")
         products = find_covering_products(["q1"], ra, dec, radius_as / 3600.0)
 
     if not products:
-        print(f"No Euclid image products cover ({ra:.7f}, {dec:.7f}).")
+        tp.fail(f"no Euclid image products cover ({ra:.7f}, {dec:.7f})")
         nearest = nearest_products(ra, dec)
         if nearest is not None and len(nearest):
             row = nearest[0]
-            print(
+            tp.info(
                 f"nearest DR1 mosaic: TILE{row['pid']} {row['filter_name']}, "
                 f"{float(row['dist']):.2f} deg away"
             )
         sys.exit(1)
+    tp.ok(f"{len(products)} product(s) cover the position")
 
     if args.list:
         print_product_table(products)
         if args.include_raw:
             wanted = EUCLID_BANDS if bands is None else bands
+            raw_rows = []
             for band in wanted:
                 if band not in RAW_BAND_MAP:
                     continue
@@ -813,25 +835,31 @@ def main():
                     )
                     rows = job.get_results() if job else None
                     for row in rows or []:
-                        print(
-                            f"{schema:<5}RAW    {filt:<12}{str(row['pid']):<11}"
-                            f"{float(row['dist']):<10.3f}{row['file_name']}"
+                        raw_rows.append(
+                            (
+                                schema,
+                                "RAW",
+                                filt,
+                                str(row["pid"]),
+                                f"{float(row['dist']):.3f}",
+                                row["file_name"],
+                            )
                         )
+            if raw_rows:
+                tp.subheader("Raw frames")
+                tp.table(["REL", "KIND", "BAND", "ID", "DIST(deg)", "FILE"], raw_rows)
         return
 
     chosen = pick_products(products, bands, args.all)
     if not chosen:
-        print("Coverage exists but not for the requested bands. Products:")
+        tp.fail("coverage exists but not for the requested bands")
         print_product_table(products)
         sys.exit(1)
 
     if args.no_plot and not args.download:
         covered = sorted({p["band"] for p in chosen})
-        print(
-            f"coverage: {len(chosen)} product(s) cover the position - "
-            f"{', '.join(covered)}"
-        )
-        print(
+        tp.ok(f"bands covered: {', '.join(covered)}")
+        tp.info(
             "nothing fetched; drop --no-plot to display, "
             "or add --download to save"
         )
@@ -848,13 +876,14 @@ def main():
     coord = SkyCoord(ra=ra, dec=dec, unit=(u.deg, u.deg), frame="icrs")
     radius = radius_as * u.arcsec
 
+    tp.subheader("Fetching")
     saved, failed = [], []
     for p in chosen:
         if args.full:
             out = outdir / p["file_name"]
-            print(
+            tp.info(
                 f"downloading full {p['band']} {p['kind'].lower()} "
-                f"{p['id']} (may be large) ..."
+                f"{p['id']} (may be large)"
             )
             res = Euclid.get_product(
                 file_name=p["file_name"],
@@ -863,7 +892,10 @@ def main():
             )
         else:
             out = outdir / cutout_name(p, radius_as)
-            print(f"downloading {p['band']} cutout from {p['kind']} {p['id']} ...")
+            tp.info(
+                f"downloading {p['band']} cutout from "
+                f"{p['kind'].lower()} {p['id']}"
+            )
             res = Euclid.get_cutout(
                 file_path=f"{p['file_path']}/{p['file_name']}",
                 instrument=p["instrument"],
@@ -879,8 +911,16 @@ def main():
             try:
                 stamp_autophot_headers(res[0], p)
             except Exception as err:
-                print(f"  warning: header stamping failed for {res[0]}: {err}")
-        (saved if res else failed).append((p, res[0] if res else str(out)))
+                tp.warn(f"header stamping failed for {out.name}: {err}")
+        if res:
+            tp.ok(f"saved {out.name}")
+            saved.append((p, res[0]))
+        else:
+            tp.warn(
+                f"{p['band']} {p['kind'].lower()} {p['id']}: "
+                f"download failed or empty"
+            )
+            failed.append((p, str(out)))
 
     raw_saved = []
     if args.include_raw:
@@ -891,7 +931,7 @@ def main():
         for band in wanted:
             if band.lower() in have or band not in RAW_BAND_MAP:
                 continue
-            print(f"no processed {band} coverage; trying raw frames ...")
+            tp.info(f"no processed {band} coverage; trying raw frames")
             raw_saved += fetch_raw_band(
                 band,
                 schemas,
@@ -905,12 +945,10 @@ def main():
             )
 
     if not args.download and not args.no_plot:
-        for p, path in failed:
-            print(f"  FAILED: {p['band']} {p['kind'].lower()} {p['id']}")
         paths = [str(p) for _, p in saved] + [str(p) for p in raw_saved]
         if not paths:
+            tp.fail("no images to display")
             sys.exit(1)
-        sys.path.insert(0, str(Path(__file__).resolve().parent))
         import matplotlib
 
         import make_collage
@@ -926,22 +964,20 @@ def main():
         ):
             png = Path(f"euclid_collage_{ra:.4f}_{dec:.4f}.png").resolve()
             make_collage.render(paths, ra, dec, out=png)
-            print(f"[warn] no display available; wrote {png}")
+            tp.warn(f"no display available; wrote {png}")
         else:
-            print(
-                f"displaying {len(paths)} image(s) "
-                f"(close the window to exit)"
+            tp.info(
+                f"displaying {len(paths)} image(s); "
+                f"close the window to exit"
             )
             make_collage.render(paths, ra, dec, show=True)
-            print("[info] Slán go fóill")
+            tp.info("Slán go fóill")
         return
 
-    for _, path in saved:
-        print(f"  saved: {path}")
-    for p, path in failed:
-        print(f"  FAILED: {p['band']} {p['kind'].lower()} {p['id']}")
-    print(f"done: {len(saved) + len(raw_saved)} file(s) in {outdir}")
-    if failed and not raw_saved:
+    n_saved = len(saved) + len(raw_saved)
+    if n_saved:
+        tp.ok(f"{n_saved} file(s) in {outdir}")
+    if failed and not n_saved:
         sys.exit(1)
 
 
@@ -950,5 +986,5 @@ if __name__ == "__main__":
         main()
     except KeyboardInterrupt:
         print()
-        print("[info] Slán go fóill")
+        tp.info("Slán go fóill")
         sys.exit(130)
