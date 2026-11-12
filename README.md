@@ -40,6 +40,7 @@ Coordinates work as `ra dec`, `ra,dec`, or a sexagesimal string.
 | `-r 60` | cutout radius in arcsec (default 30, max 1800) |
 | `--size 90` | cutout width in arcsec; alternative to `-r` (size = 2 x radius) |
 | `--download` | save the FITS cutouts; without it they are displayed but not kept |
+| `--no-plot` | do not display the figure; alone it only reports coverage |
 | `-b VIS,NIR_Y` | band list; `euclid` (default) = VIS + NIR_Y/J/H, `all` adds DECAM/HSC/MEGACAM/PANSTARRS |
 | `--release q1` / `both` | release to search; dr1 is the default, q1 is tried when dr1 has no coverage |
 | `--all` | fetch every covering product, not one per band |
