@@ -10,12 +10,12 @@ and shows them in a collage figure. Public DR1/Q1 data only, no login needed.
 SATURATE, AIRMASS) where the archive header lacks them.
 
 Examples:
-    euclid-cutouts 91.0013213,-54.2641878
-    euclid-cutouts 91.0013213 -54.2641878 --download
+    euclid-cutouts 60.3372991,-49.9318588
+    euclid-cutouts 60.3372991 -49.9318588 --download
     euclid-cutouts "06h04m00.32s -54d15m51.1s"
-    euclid-cutouts 91.0 -54.3 -r 60 -b VIS,NIR_Y
-    euclid-cutouts 91.0 -54.3 --list
-    euclid-cutouts 91.0 -54.3 --include-raw   # raw detector cutouts too
+    euclid-cutouts 60.34 -49.93 -r 60 -b VIS,NIR_Y
+    euclid-cutouts 60.34 -49.93 --list
+    euclid-cutouts 60.34 -49.93 --include-raw   # raw detector cutouts too
 """
 
 import argparse
