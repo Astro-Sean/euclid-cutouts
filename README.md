@@ -4,9 +4,8 @@ Terminal command that grabs Euclid archive images at a sky position.
 
 It queries the ESA Euclid Science Archive (astroquery.esa.euclid) for image
 products whose footprint covers the position, fetches a FITS cutout per
-band, and displays them in a collage. `--download` saves the FITS filesPublic DR1/Q1 data only, no login required.
+band, and displays them in a collage. `--download` saves the FITS files.Public DR1/Q1 data only, no login required.
 
-![DR1 mosaic cutouts in VIS and NIR Y/J/H at RA 60.337278, Dec -49.9318472](example_collage.png)
 
 
 ## Install
@@ -29,6 +28,9 @@ instead.
 
 Coordinates work as `ra dec`, `ra,dec`, or a sexagesimal string.
 
+![DR1 mosaic cutouts in VIS and NIR Y/J/H at RA 60.337278, Dec -49.9318472](example_collage.png)
+
+
 | flag | effect |
 |---|---|
 | `-r 60` | cutout radius in arcsec (default 30, max 1800) |
@@ -45,15 +47,4 @@ Coordinates work as `ra dec`, `ra,dec`, or a sexagesimal string.
 | `--no-header-fix` | skip the keyword stamping |
 
 
-## make_collage.py
 
-```bash
-python3 make_collage.py <ra> <dec> <out.png> <fits files...>
-```
-
-Builds a multi-panel figure with one WCS-projected panel per FITS file
-(ZScale, no interpolation). Each panel shows a small zoom box on the
-target, a 5-arcsecond zoomed inset with tight marker notches, an N/E
-compass in the bottom-right, a band label top-left, and the product id
-bottom-left. Mirrored images
-are flipped to the usual north-up/east-left convention.
