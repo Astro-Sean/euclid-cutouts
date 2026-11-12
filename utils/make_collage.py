@@ -102,11 +102,12 @@ def nice_scale_arcsec(field_as):
     return 0.5
 
 
-def add_scalebar(ax, arcsec, pixscale, shape, color="yellow"):
+def add_scalebar(ax, arcsec, scale_as, shape, color="yellow"):
     """Horizontal scale bar, bottom-left, above the product label."""
     ny, nx = shape
+    sx, sy = scale_as
     x0, y0 = 0.05 * nx, 0.15 * ny
-    bar = arcsec / pixscale
+    bar = arcsec / sx
     ax.plot(
         [x0, x0 + bar], [y0, y0], color=color, lw=2.0, solid_capstyle="butt"
     )
@@ -119,10 +120,13 @@ def add_scalebar(ax, arcsec, pixscale, shape, color="yellow"):
         ha="center",
         va="bottom",
     )
+    px_label = (
+        f'{sx:.2f}"/px' if np.isclose(sx, sy) else f'{sx:.2f}x{sy:.2f}"/px'
+    )
     ax.text(
         x0 + bar / 2,
         y0 - 0.02 * ny,
-        f'{pixscale:.2f}"/px',
+        px_label,
         color=color,
         fontsize=7,
         ha="center",
@@ -130,12 +134,15 @@ def add_scalebar(ax, arcsec, pixscale, shape, color="yellow"):
     )
 
 
-def add_zoom_inset(ax, data, x0, y0, norm, pixscale, color="red"):
+def add_zoom_inset(ax, data, x0, y0, norm, scale_as, color="red"):
     """Top-right inset showing a 5-arcsec-wide zoom centred on the target."""
     ny, nx = data.shape
-    half = max(int(round(2.5 / pixscale)), 3)
+    sx, sy = scale_as
+    half = max(int(round(2.5 / sx)), 3)
     x1, x2 = np.clip([x0 - half, x0 + half], 0, nx).astype(int)
-    y1, y2 = np.clip([y0 - half, y0 + half], 0, ny).astype(int)
+    y1, y2 = np.clip(
+        [y0 - int(round(2.5 / sy)), y0 + int(round(2.5 / sy))], 0, ny
+    ).astype(int)
     crop = data[y1:y2, x1:x2]
     if crop.size == 0:
         return
@@ -168,7 +175,7 @@ def add_zoom_inset(ax, data, x0, y0, norm, pixscale, color="red"):
             lw=1.2,
         )
     # 1-arcsec scale bar, bottom-left of the inset
-    bar = 1.0 / pixscale
+    bar = 1.0 / sx
     bx, by = x1 + 0.08 * (x2 - x1), y1 + 0.09 * (y2 - y1)
     axins.plot(
         [bx, bx + bar], [by, by], color="yellow", lw=1.5,
@@ -246,14 +253,14 @@ def render(files, ra, dec, out=None, show=True):
         )
         ax.imshow(data, origin="lower", cmap="gray", norm=norm,
                   interpolation="none")
-        pixscale = proj_plane_pixel_scales(wcs)[0] * 3600.0
+        scales = proj_plane_pixel_scales(wcs) * 3600.0
         add_compass(ax, wcs, data.shape)
         add_scalebar(
-            ax, nice_scale_arcsec(data.shape[1] * pixscale), pixscale,
+            ax, nice_scale_arcsec(data.shape[1] * scales[0]), scales,
             data.shape,
         )
         x0, y0 = wcs.world_to_pixel(target)
-        add_zoom_inset(ax, data, x0, y0, norm, pixscale)
+        add_zoom_inset(ax, data, x0, y0, norm, scales)
         ax.coords.grid(True, color="cyan", alpha=0.3, ls=":")
         for axis in ("ra", "dec"):
             ax.coords[axis].set_axislabel(
