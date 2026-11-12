@@ -24,7 +24,7 @@ cross-correlation, and cuts out the covering detector. Raw cutouts are
 single uncalibrated exposures: fine for checking a source or a rough
 flux, not for photometry without full reduction.
 
-`make_collage.py` renders a figure with one WCS-projected panel per
+`utils/make_collage.py` renders a figure with one WCS-projected panel per
 FITS file: ZScale stretch, no interpolation, a 5-arcsecond zoomed inset
 with notch markers on the target, an N/E compass bottom-right, a band
 label top-left, and the product id bottom-left. Mirrored images are
@@ -35,17 +35,17 @@ flipped on load so every panel shows north up, east left.
 - `euclid-cutouts.py` - the command: archive query, download, header
   stamping, raw extraction. Installed by symlinking to
   `~/.local/bin/euclid-cutouts`.
-- `make_collage.py` - collage renderer. euclid-cutouts imports its
-  `render()` for the default display mode; it also works standalone
-  from the command line.
-- `termprint.py` - dependency-free terminal output helpers ([ok]/
+- `utils/make_collage.py` - collage renderer. euclid-cutouts imports
+  its `render()` for the default display mode; it also works
+  standalone from the command line.
+- `utils/termprint.py` - dependency-free terminal output helpers ([ok]/
   [warn]/[error]/[info] tags, framed headers, tables, kv pairs). All
   console output goes through it; do not add bare print calls for
   status or results.
 - `Euclid_VIS.vis.dat` - VIS bandpass curve (wavelength, transmission)
-  for AutoPhOT filter calibration.
+  for AutoPhOT filter calibration. Local only, not tracked.
 - `example_collage.png` - README figure, regenerated with
-  `make_collage.py` when the layout changes.
+  `utils/make_collage.py` when the layout changes.
 - `test/` - working data, not committed.
 
 ## Commit rules
