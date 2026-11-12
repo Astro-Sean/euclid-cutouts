@@ -3,17 +3,17 @@
 Terminal command that grabs Euclid archive images at a sky position.
 
 It queries the ESA Euclid Science Archive (astroquery.esa.euclid) for image
-products whose footprint covers the position, downloads a FITS cutout per
-band, and stamps in the header keywords AutoPhOT needs at ingest
+products whose footprint covers the position, fetches a FITS cutout per
+band, and displays them in a collage. `--download` saves the FITS files
+instead, stamped with the header keywords AutoPhOT needs at ingest
 (TELESCOP, INSTRUME, FILTER, EXPTIME, GAIN, RDNOISE, SATURATE, DATE-OBS,
 MJD-OBS). Public DR1/Q1 data only, no login required.
 
 ![DR1 mosaic cutouts in VIS and NIR Y/J/H at RA 60.337278, Dec -49.9318472](example_collage.png)
 
-The example above comes from `euclid-cutouts 60.337278 -49.9318472`
-followed by `make_collage.py`. That position sits in Euclid Deep Field
-South, so all four bands resolve to processed DR1 mosaics from
-TILE101277680.
+The example above is what `euclid-cutouts 60.337278 -49.9318472`
+displays. That position sits in Euclid Deep Field South, so all four
+bands resolve to processed DR1 mosaics from TILE101277680.
 
 ## Install
 
@@ -28,20 +28,25 @@ ln -s "$(pwd)/euclid-cutouts.py" ~/.local/bin/euclid-cutouts
 euclid-cutouts 91.0014173 -54.2642342
 ```
 
+That fetches the covering cutouts and shows them in a figure. Nothing
+is kept on disk unless `--download` is given. With no display
+available, the figure is written to `euclid_collage_<ra>_<dec>.png`
+instead.
+
 Coordinates work as `ra dec`, `ra,dec`, or a sexagesimal string.
 
 | flag | effect |
 |---|---|
 | `-r 60` | cutout radius in arcsec (default 30, max 1800) |
 | `--size 90` | cutout width in arcsec; alternative to `-r` (size = 2 x radius) |
-| `--download` | save into the current directory (same as `-o .`) |
+| `--download` | save the FITS cutouts; without it they are displayed but not kept |
 | `-b VIS,NIR_Y` | band list; `euclid` (default) = VIS + NIR_Y/J/H, `all` adds DECAM/HSC/MEGACAM/PANSTARRS |
 | `--release q1` / `both` | release to search; dr1 is the default, q1 is tried when dr1 has no coverage |
 | `--all` | fetch every covering product, not one per band |
 | `--include-raw` | for bands with no processed image, fetch raw detector frames and cut out the covering detector |
-| `--full` | download the full product file instead of a cutout |
-| `-l` | list covering products without downloading |
-| `-o dir` | output directory |
+| `--full` | save the full product file instead of a cutout (needs `--download`) |
+| `-l` | list covering products without fetching |
+| `-o dir` | output directory for `--download` (default: cwd) |
 | `--no-header-fix` | skip the keyword stamping |
 
 ## How it works
