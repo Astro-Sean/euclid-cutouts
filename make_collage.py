@@ -4,7 +4,8 @@
 One WCS-projected panel per FITS file (2x2 when four are given, a single
 panel for one). ZScale stretch, no interpolation, a small zoom box on the
 target, a 5-arcsecond zoomed inset with notch markers, an N/E compass in
-the bottom-right, and a band label top-left. Mirrored images are flipped
+the bottom-right, a band label top-left, and the product id bottom-left.
+Mirrored images are flipped
 to north-up/east-left before display.
 
 Usage:
@@ -183,18 +184,36 @@ def main():
                 "RA" if axis == "ra" else "Dec", fontsize=10
             )
             ax.coords[axis].set_ticklabel(size=8)
-        # EUC_<rel>_<band>_<KIND><id>_r<N>as.fits: band may contain '_' itself,
-        # so the product id is taken from the end of the name.
-        product = Path(fname).stem.split("_")[-2]
+        # EUC_<rel>_<band tokens>_<descriptor>_r<N>as.fits: the band may
+        # contain '_' itself (DECAM_i), so the product id is everything
+        # between the band tokens and the trailing size token, minus RAW
+        # and timestamp tokens.
+        stem = Path(fname).stem.split("_")
+        descriptor = stem[2 + len(band.split("_")) : -1]
+        product = "_".join(
+            t
+            for t in descriptor
+            if t != "RAW" and not (t.startswith("T") and t[1:].isdigit())
+        )
         ax.text(
             0.02,
             0.98,
-            f"{band} {product}",
+            band.removeprefix("NIR_"),
             transform=ax.transAxes,
             color="yellow",
             fontsize=9,
             ha="left",
             va="top",
+        )
+        ax.text(
+            0.02,
+            0.02,
+            product,
+            transform=ax.transAxes,
+            color="yellow",
+            fontsize=8,
+            ha="left",
+            va="bottom",
         )
 
     fig.tight_layout()
