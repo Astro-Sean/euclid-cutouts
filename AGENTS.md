@@ -25,9 +25,9 @@ flux, not for photometry without full reduction.
 
 `make_collage.py` renders a figure with one WCS-projected panel per
 FITS file: ZScale stretch, no interpolation, a 5-arcsecond zoomed inset
-with notch markers on the target, an N/E compass bottom-right, and a
-band label top-left. Mirrored images are flipped on load so every panel
-shows north up, east left.
+with notch markers on the target, an N/E compass bottom-right, a band
+label top-left, and the product id bottom-left. Mirrored images are
+flipped on load so every panel shows north up, east left.
 
 ## File map
 
