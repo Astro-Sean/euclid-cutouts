@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""query_EUCLID - download Euclid FITS images at a sky position.
+"""euclid-cutouts - download Euclid FITS images at a sky position.
 
 Queries the ESA Euclid Science Archive (via astroquery.esa.euclid) for image
 products whose footprint contains the position, then downloads a cutout
@@ -9,12 +9,12 @@ Downloaded files get the standard FITS keywords AutoPhOT looks up at ingest
 SATURATE, AIRMASS) where the archive header lacks them.
 
 Examples:
-    query_EUCLID 91.0013213,-54.2641878
-    query_EUCLID 91.0013213 -54.2641878
-    query_EUCLID "06h04m00.32s -54d15m51.1s"
-    query_EUCLID 91.0 -54.3 -r 60 -b VIS,NIR_Y
-    query_EUCLID 91.0 -54.3 --list
-    query_EUCLID 91.0 -54.3 --include-raw   # raw detector cutouts too
+    euclid-cutouts 91.0013213,-54.2641878
+    euclid-cutouts 91.0013213 -54.2641878
+    euclid-cutouts "06h04m00.32s -54d15m51.1s"
+    euclid-cutouts 91.0 -54.3 -r 60 -b VIS,NIR_Y
+    euclid-cutouts 91.0 -54.3 --list
+    euclid-cutouts 91.0 -54.3 --include-raw   # raw detector cutouts too
 """
 
 import argparse
@@ -314,7 +314,7 @@ def stamp_autophot_headers(fits_path, product):
             if product["zero_point_err"] is not None:
                 hdr["MAGZERR"] = float(product["zero_point_err"])
 
-        hdr["COMMENT"] = "AutoPhOT keywords stamped by query_EUCLID"
+        hdr["COMMENT"] = "AutoPhOT keywords stamped by euclid-cutouts"
 
 
 # --- Raw detector frames ------------------------------------------------
@@ -647,7 +647,7 @@ def nearest_products(ra, dec):
 
 def main():
     parser = argparse.ArgumentParser(
-        prog="query_EUCLID",
+        prog="euclid-cutouts",
         description="Download Euclid archive FITS images at a sky position.",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog=__doc__,
