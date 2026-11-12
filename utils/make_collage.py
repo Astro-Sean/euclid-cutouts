@@ -119,6 +119,15 @@ def add_scalebar(ax, arcsec, pixscale, shape, color="yellow"):
         ha="center",
         va="bottom",
     )
+    ax.text(
+        x0 + bar / 2,
+        y0 - 0.02 * ny,
+        f'{pixscale:.2f}"/px',
+        color=color,
+        fontsize=7,
+        ha="center",
+        va="top",
+    )
 
 
 def add_zoom_inset(ax, data, x0, y0, norm, pixscale, color="red"):
