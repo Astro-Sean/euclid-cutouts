@@ -94,6 +94,33 @@ def add_compass(ax, wcs, shape, color="red"):
         )
 
 
+def nice_scale_arcsec(field_as):
+    """Largest round-number scale bar that stays well inside the field."""
+    for s in (60, 30, 20, 10, 5, 2, 1):
+        if s <= 0.35 * field_as:
+            return s
+    return 0.5
+
+
+def add_scalebar(ax, arcsec, pixscale, shape, color="yellow"):
+    """Horizontal scale bar, bottom-left, above the product label."""
+    ny, nx = shape
+    x0, y0 = 0.05 * nx, 0.10 * ny
+    bar = arcsec / pixscale
+    ax.plot(
+        [x0, x0 + bar], [y0, y0], color=color, lw=2.0, solid_capstyle="butt"
+    )
+    ax.text(
+        x0 + bar / 2,
+        y0 + 0.02 * ny,
+        f'{arcsec:g}"',
+        color=color,
+        fontsize=8,
+        ha="center",
+        va="bottom",
+    )
+
+
 def add_zoom_inset(ax, data, x0, y0, norm, pixscale, color="red"):
     """Top-right inset showing a 5-arcsec-wide zoom centred on the target."""
     ny, nx = data.shape
@@ -131,9 +158,39 @@ def add_zoom_inset(ax, data, x0, y0, norm, pixscale, color="red"):
             color=color,
             lw=1.2,
         )
+    # 1-arcsec scale bar, bottom-left of the inset
+    bar = 1.0 / pixscale
+    bx, by = x1 + 0.08 * (x2 - x1), y1 + 0.09 * (y2 - y1)
+    axins.plot(
+        [bx, bx + bar], [by, by], color="yellow", lw=1.5,
+        solid_capstyle="butt",
+    )
+    axins.text(
+        bx + bar / 2,
+        by + 0.06 * (y2 - y1),
+        '1"',
+        color="yellow",
+        fontsize=7,
+        ha="center",
+        va="bottom",
+    )
     ax.indicate_inset_zoom(axins, edgecolor=color, alpha=0.6, lw=0.8)
 
 BAND_ORDER = ["VIS", "NIR_Y", "NIR_J", "NIR_H"]
+
+# Throughput range shown under the band name: 50% cut-on/off edges of
+# the total spectral response. NISP values from Euclid Collab.,
+# Schirmer+2022 (A&A 662, A92, Table 1); VIS from the FWHM of
+# Euclid_VIS.vis.dat. Escapes keep the source plain ASCII.
+BAND_LABELS = {
+    "VIS": "VIS (5400-9100 \u00c5)",
+    "NIR_Y": "Y (0.950-1.212 \u00b5m)",
+    "NIR_J": "J (1.168-1.567 \u00b5m)",
+    "NIR_H": "H (1.522-2.021 \u00b5m)",
+    "Y": "Y (0.950-1.212 \u00b5m)",
+    "J": "J (1.168-1.567 \u00b5m)",
+    "H": "H (1.522-2.021 \u00b5m)",
+}
 
 
 def band_sort_key(path):
@@ -182,6 +239,10 @@ def render(files, ra, dec, out=None, show=True):
                   interpolation="none")
         pixscale = proj_plane_pixel_scales(wcs)[0] * 3600.0
         add_compass(ax, wcs, data.shape)
+        add_scalebar(
+            ax, nice_scale_arcsec(data.shape[1] * pixscale), pixscale,
+            data.shape,
+        )
         x0, y0 = wcs.world_to_pixel(target)
         add_zoom_inset(ax, data, x0, y0, norm, pixscale)
         ax.coords.grid(True, color="cyan", alpha=0.3, ls=":")
@@ -204,7 +265,7 @@ def render(files, ra, dec, out=None, show=True):
         ax.text(
             0.02,
             0.98,
-            band.removeprefix("NIR_"),
+            BAND_LABELS.get(band, band.removeprefix("NIR_")),
             transform=ax.transAxes,
             color="yellow",
             fontsize=9,
