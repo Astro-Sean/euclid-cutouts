@@ -15,6 +15,9 @@ Usage:
 import sys
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import termprint as tp
+
 import astropy.units as u
 import matplotlib.pyplot as plt
 import numpy as np
@@ -233,7 +236,7 @@ def main():
     ra, dec = float(sys.argv[1]), float(sys.argv[2])
     out = Path(sys.argv[3])
     render(sys.argv[4:], ra, dec, out=out)
-    print(f"saved {out}")
+    tp.ok(f"saved {out}")
 
 
 if __name__ == "__main__":
