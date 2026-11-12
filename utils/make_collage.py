@@ -105,7 +105,7 @@ def nice_scale_arcsec(field_as):
 def add_scalebar(ax, arcsec, pixscale, shape, color="yellow"):
     """Horizontal scale bar, bottom-left, above the product label."""
     ny, nx = shape
-    x0, y0 = 0.05 * nx, 0.10 * ny
+    x0, y0 = 0.05 * nx, 0.15 * ny
     bar = arcsec / pixscale
     ax.plot(
         [x0, x0 + bar], [y0, y0], color=color, lw=2.0, solid_capstyle="butt"
