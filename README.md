@@ -70,5 +70,6 @@ python3 make_collage.py <ra> <dec> <out.png> <fits files...>
 Builds a multi-panel figure with one WCS-projected panel per FITS file
 (ZScale, no interpolation). Each panel shows a small zoom box on the
 target, a 5-arcsecond zoomed inset with tight marker notches, an N/E
-compass in the bottom-right, and a band label top-left. Mirrored images
+compass in the bottom-right, a band label top-left, and the product id
+bottom-left. Mirrored images
 are flipped to the usual north-up/east-left convention.
