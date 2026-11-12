@@ -8,12 +8,12 @@ band, and stamps in the header keywords AutoPhOT needs at ingest
 (TELESCOP, INSTRUME, FILTER, EXPTIME, GAIN, RDNOISE, SATURATE, DATE-OBS,
 MJD-OBS). Public DR1/Q1 data only, no login required.
 
-![VIS stack plus raw Y/J/H detector cutouts at RA 91.0014173, Dec -54.2642342](example_collage.png)
+![DR1 mosaic cutouts in VIS and NIR Y/J/H at RA 60.337278, Dec -49.9318472](example_collage.png)
 
-The example above comes from `query_EUCLID 91.0014173 -54.2642342
---include-raw` followed by `make_collage.py`. Only VIS has processed
-coverage at this position, so Y/J/H are raw detector cutouts (DET44,
-uncalibrated).
+The example above comes from `query_EUCLID 60.337278 -49.9318472`
+followed by `make_collage.py`. That position sits in Euclid Deep Field
+South, so all four bands resolve to processed DR1 mosaics from
+TILE101277680.
 
 ## Install
 
