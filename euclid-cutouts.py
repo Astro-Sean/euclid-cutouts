@@ -729,6 +729,12 @@ def main():
         "and displayed but not kept",
     )
     parser.add_argument(
+        "--no-plot",
+        "--no_plot",
+        action="store_true",
+        help="do not display the figure; alone it only reports coverage",
+    )
+    parser.add_argument(
         "--no-header-fix",
         action="store_true",
         help="keep archive headers untouched (skip AutoPhOT keyword stamping)",
@@ -819,6 +825,18 @@ def main():
         print_product_table(products)
         sys.exit(1)
 
+    if args.no_plot and not args.download:
+        covered = sorted({p["band"] for p in chosen})
+        print(
+            f"coverage: {len(chosen)} product(s) cover the position - "
+            f"{', '.join(covered)}"
+        )
+        print(
+            "nothing fetched; drop --no-plot to display, "
+            "or add --download to save"
+        )
+        return
+
     if args.download:
         outdir = Path(args.outdir).expanduser().resolve()
         outdir.mkdir(parents=True, exist_ok=True)
@@ -886,7 +904,7 @@ def main():
                 args.no_header_fix,
             )
 
-    if not args.download:
+    if not args.download and not args.no_plot:
         for p, path in failed:
             print(f"  FAILED: {p['band']} {p['kind'].lower()} {p['id']}")
         paths = [str(p) for _, p in saved] + [str(p) for p in raw_saved]
