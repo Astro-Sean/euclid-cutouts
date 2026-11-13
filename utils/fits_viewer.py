@@ -92,6 +92,20 @@ from scipy import ndimage
 # (pixels) from the crosshair is a different source, not a correction.
 RECENTRE_MAX_PX = 6.0
 
+# Short titles on the panels and one colour per band on the shared
+# histogram, ordered by wavelength.
+BAND_LABEL = {
+    "NIR_Y": "Y", "NIR_J": "J", "NIR_H": "H", "VIS": "VIS"
+}
+BAND_COLOR = {
+    "VIS": "tab:blue", "Y": "tab:green", "J": "tab:orange",
+    "H": "tab:red",
+}
+
+
+def band_label(raw):
+    return BAND_LABEL.get(raw, raw or "?")
+
 STRETCHES = {
     "zscale": LinearStretch(),
     "asinh": AsinhStretch(a=0.1),
@@ -473,8 +487,13 @@ class FitsViewer(QMainWindow):
         self._apply_norm(p)
         lo, hi = sorted((p["lo"], p["hi"]))
         if self._lo_line is not None:
-            self._lo_line.set_xdata([lo, lo])
-            self._hi_line.set_xdata([hi, hi])
+            span = p["hmax"] - p["hmin"] or 1.0
+            self._lo_line.set_xdata(
+                [(lo - p["hmin"]) / span] * 2
+            )
+            self._hi_line.set_xdata(
+                [(hi - p["hmin"]) / span] * 2
+            )
         self._sync_sliders()
         self.canvas.draw_idle()
 
@@ -540,7 +559,9 @@ class FitsViewer(QMainWindow):
             ax.coords.grid(True, color="cyan", alpha=0.3, ls=":")
             for axis in ("ra", "dec"):
                 ax.coords[axis].set_ticklabel(size=7)
-            ax.set_title(p["band"], fontsize=9, loc="left")
+            ax.set_title(
+                band_label(p["band"]), fontsize=9, loc="left"
+            )
             # inner-edge labels would collide with the next panel, so
             # RA lives on the bottom row and Dec on the left column
             if row < rows - 1:
@@ -555,11 +576,11 @@ class FitsViewer(QMainWindow):
             ax.callbacks.connect("ylim_changed", self._view_sync)
 
         self.ax_hist = self.fig.add_axes(
-            [0.09, 0.03, 0.88, 0.09], label="histogram"
+            [0.08, 0.025, 0.89, 0.08], label="histogram"
         )
         self.fig.subplots_adjust(
-            left=0.06, right=0.97, top=0.955, bottom=0.15,
-            hspace=0.12, wspace=0.08,
+            left=0.07, right=0.97, top=0.95, bottom=0.19,
+            hspace=0.22, wspace=0.15,
         )
         self._redraw_marks()
 
@@ -603,26 +624,46 @@ class FitsViewer(QMainWindow):
         self.canvas.draw_idle()
 
     def _draw_hist(self):
+        """Every panel's histogram, each in its band colour.
+
+        Data ranges differ per band, so curves sit on a common
+        fraction-of-range axis (0 = panel hmin, 1 = hmax) and are
+        normalized to their own peak - the plot compares distribution
+        shapes, not absolute counts. The cut markers track the active
+        panel's fraction of its own range.
+        """
         p = self._panel()
         self.ax_hist.cla()
-        self.ax_hist.fill_between(
-            p["edges"][:-1],
-            np.log10(np.clip(p["counts"], 1, None)),
-            step="post",
-            color="0.7",
-            lw=0,
-        )
-        self.ax_hist.set_xlim(p["hmin"], p["hmax"])
-        self.ax_hist.set_ylim(bottom=0)
+        for q in self.panels:
+            span = q["hmax"] - q["hmin"] or 1.0
+            x = (q["edges"][:-1] - q["hmin"]) / span
+            y = np.log10(np.clip(q["counts"], 1, None))
+            y = y / y.max() if y.max() > 0 else y
+            label = band_label(q["band"])
+            color = BAND_COLOR.get(label, "0.5")
+            active = q is p
+            self.ax_hist.plot(
+                x, y, color=color, lw=1.6 if active else 0.9,
+                alpha=1.0 if active else 0.6, label=label,
+            )
+        span = p["hmax"] - p["hmin"] or 1.0
+        self.ax_hist.set_xlim(0, 1)
+        self.ax_hist.set_ylim(bottom=0, top=1.05)
         self.ax_hist.set_xticks([])
         self.ax_hist.set_yticks([])
         for spine in self.ax_hist.spines.values():
             spine.set_linewidth(0.5)
         self._lo_line = self.ax_hist.axvline(
-            p["lo"], color="green", lw=1.2, picker=6
+            (p["lo"] - p["hmin"]) / span,
+            color="green", lw=1.2, picker=6,
         )
         self._hi_line = self.ax_hist.axvline(
-            p["hi"], color="red", lw=1.2, picker=6
+            (p["hi"] - p["hmin"]) / span,
+            color="red", lw=1.2, picker=6,
+        )
+        self.ax_hist.legend(
+            fontsize=7, loc="upper right", frameon=False, ncol=4,
+            handlelength=1.2, columnspacing=0.8,
         )
         self.ax_hist.set_title(
             p["name"], fontsize=7, loc="left", pad=1
@@ -794,7 +835,10 @@ class FitsViewer(QMainWindow):
             if event.xdata is None:
                 return
             p = self._panel()
-            v = float(event.xdata)
+            # the histogram axis is a fraction of the panel's display
+            # range - convert back to a data value before storing
+            span = p["hmax"] - p["hmin"] or 1.0
+            v = p["hmin"] + float(event.xdata) * span
             self._drag = (
                 "lo" if abs(v - p["lo"]) <= abs(v - p["hi"]) else "hi"
             )
