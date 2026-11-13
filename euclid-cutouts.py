@@ -21,6 +21,7 @@ Examples:
 """
 
 import argparse
+import os
 import re
 import sys
 import tempfile
@@ -813,6 +814,12 @@ def main():
         "PDF with editable text + 300-dpi PNG) instead of displaying",
     )
     parser.add_argument(
+        "--gui",
+        action="store_true",
+        help="open the Qt image viewer (histogram, stretch and cut "
+        "controls, band stepping) instead of the static figure",
+    )
+    parser.add_argument(
         "--no-header-fix",
         action="store_true",
         help="keep archive headers untouched (skip AutoPhOT keyword stamping)",
@@ -854,6 +861,8 @@ def main():
         args.outdir = "."
     if args.full and not args.download:
         tp.die("--full requires --download", 2)
+    if args.pub and args.gui:
+        tp.die("use only one of --pub and --gui", 2)
     if not args.full and not 0 < radius_as <= MAX_RADIUS_ARCSEC:
         tp.die(f"radius must be within (0, {MAX_RADIUS_ARCSEC:g}] arcsec", 2)
 
@@ -1037,6 +1046,20 @@ def main():
             pdf = make_collage.render(paths, ra, dec, out=base, pub=True)
             tp.ok(f"wrote {pdf}")
             tp.ok(f"wrote {pdf.with_suffix('.png')}")
+        elif args.gui:
+            if not (
+                os.environ.get("DISPLAY")
+                or os.environ.get("WAYLAND_DISPLAY")
+                or os.environ.get("QT_QPA_PLATFORM")
+            ):
+                tp.die("--gui needs a display", 2)
+            try:
+                import fits_viewer
+            except SystemExit as err:
+                tp.die(str(err), 2)
+            tp.info("close the viewer window to exit")
+            fits_viewer.show(paths)
+            tp.info("Slán go fóill")
         else:
             import matplotlib
 
