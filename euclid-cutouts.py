@@ -17,6 +17,7 @@ Examples:
     euclid-cutouts 60.34 -49.93 --list
     euclid-cutouts 60.34 -49.93 --include-raw   # raw detector cutouts too
     euclid-cutouts 2026abc                      # name resolved via Sesame
+    euclid-cutouts 60.34 -49.93 --pub           # journal-quality PDF+PNG
 """
 
 import argparse
@@ -793,6 +794,12 @@ def main():
         help="do not display the figure; alone it only reports coverage",
     )
     parser.add_argument(
+        "--pub",
+        action="store_true",
+        help="write a publication figure (journal column width, vector "
+        "PDF with editable text + 300-dpi PNG) instead of displaying",
+    )
+    parser.add_argument(
         "--no-header-fix",
         action="store_true",
         help="keep archive headers untouched (skip AutoPhOT keyword stamping)",
@@ -1000,35 +1007,47 @@ def main():
                 args.no_header_fix,
             )
 
-    if not args.download and not args.no_plot:
+    if args.pub or (not args.download and not args.no_plot):
         paths = [str(p) for _, p in saved] + [str(p) for p in raw_saved]
         if not paths:
             tp.fail("no images to display")
             sys.exit(1)
-        import matplotlib
 
         import make_collage
 
-        if matplotlib.get_backend().lower() in (
-            "agg",
-            "cairo",
-            "pdf",
-            "pgf",
-            "ps",
-            "svg",
-            "template",
-        ):
-            png = Path(f"euclid_collage_{ra:.4f}_{dec:.4f}.png").resolve()
-            make_collage.render(paths, ra, dec, out=png)
-            tp.warn(f"no display available; wrote {png}")
+        if args.pub:
+            fig_dir = Path(args.outdir).expanduser().resolve()
+            fig_dir.mkdir(parents=True, exist_ok=True)
+            base = fig_dir / f"euclid_collage_{ra:.4f}_{dec:.4f}.png"
+            pdf = make_collage.render(paths, ra, dec, out=base, pub=True)
+            tp.ok(f"wrote {pdf}")
+            tp.ok(f"wrote {pdf.with_suffix('.png')}")
         else:
-            tp.info(
-                f"displaying {len(paths)} image(s); "
-                f"close the window to exit"
-            )
-            make_collage.render(paths, ra, dec, show=True)
-            tp.info("Slán go fóill")
-        return
+            import matplotlib
+
+            if matplotlib.get_backend().lower() in (
+                "agg",
+                "cairo",
+                "pdf",
+                "pgf",
+                "ps",
+                "svg",
+                "template",
+            ):
+                png = Path(
+                    f"euclid_collage_{ra:.4f}_{dec:.4f}.png"
+                ).resolve()
+                make_collage.render(paths, ra, dec, out=png)
+                tp.warn(f"no display available; wrote {png}")
+            else:
+                tp.info(
+                    f"displaying {len(paths)} image(s); "
+                    f"close the window to exit"
+                )
+                make_collage.render(paths, ra, dec, show=True)
+                tp.info("Slán go fóill")
+        if not args.download:
+            return
 
     n_saved = len(saved) + len(raw_saved)
     if n_saved:
