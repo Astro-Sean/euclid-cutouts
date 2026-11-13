@@ -22,7 +22,6 @@ try:
     from PySide6.QtWidgets import (
         QAbstractItemView,
         QApplication,
-        QButtonGroup,
         QCheckBox,
         QComboBox,
         QFileDialog,
@@ -43,7 +42,6 @@ except ImportError:
         from PyQt6.QtWidgets import (
             QAbstractItemView,
             QApplication,
-            QButtonGroup,
             QCheckBox,
             QComboBox,
             QFileDialog,
@@ -66,6 +64,7 @@ except ImportError:
 
 import math
 
+import matplotlib.patheffects as pe
 import numpy as np
 from astropy import units as u
 from astropy.coordinates import SkyCoord
@@ -326,6 +325,9 @@ class FitsViewer(QMainWindow):
         self.ra_edit.setPlaceholderText("RA (deg or hh:mm:ss)")
         self.dec_edit = QLineEdit()
         self.dec_edit.setPlaceholderText("Dec (deg or dd:mm:ss)")
+        if self._mark is not None:
+            self.ra_edit.setText(f"{self._mark.ra.deg:.7f}")
+            self.dec_edit.setText(f"{self._mark.dec.deg:.7f}")
         mbox.addWidget(self.ra_edit)
         mbox.addWidget(self.dec_edit)
         row = QHBoxLayout()
@@ -353,27 +355,12 @@ class FitsViewer(QMainWindow):
         mbox.addWidget(self.mark_slider)
         crow = QHBoxLayout()
         crow.addWidget(QLabel("colour"))
-        self.color_group = QButtonGroup(self)
-        for name in (
-            "red", "cyan", "green", "yellow", "magenta", "white"
-        ):
-            btn = QPushButton()
-            btn.setCheckable(True)
-            btn.setFixedSize(22, 22)
-            btn.setToolTip(name)
-            btn.setStyleSheet(
-                f"QPushButton {{background-color: {name};"
-                " border: 1px solid #666; border-radius: 3px;}"
-                "QPushButton:checked {border: 2px solid #222;}"
-            )
-            btn.clicked.connect(
-                lambda _checked, n=name: self._mark_colour(n)
-            )
-            self.color_group.addButton(btn)
-            crow.addWidget(btn)
-            if name == self._mark_color:
-                btn.setChecked(True)
-        crow.addStretch(1)
+        self.color_combo = QComboBox()
+        self.color_combo.addItems(
+            ["red", "cyan", "green", "yellow", "magenta", "white"]
+        )
+        self.color_combo.currentTextChanged.connect(self._mark_colour)
+        crow.addWidget(self.color_combo)
         mbox.addLayout(crow)
         box.addWidget(marker)
         save_btn = QPushButton("Save figure")
@@ -587,8 +574,13 @@ class FitsViewer(QMainWindow):
             ax.coords.grid(True, color="cyan", alpha=0.3, ls=":")
             for axis in ("ra", "dec"):
                 ax.coords[axis].set_ticklabel(size=7)
-            ax.set_title(
-                band_label(p["band"]), fontsize=9, loc="left"
+            # the band goes inside the panel corner, not above it -
+            # no title strip means the grid can pack tighter
+            ax.text(
+                0.03, 0.97, band_label(p["band"]),
+                transform=ax.transAxes, color="white", fontsize=9,
+                fontweight="bold", va="top", ha="left",
+                path_effects=[pe.withStroke(linewidth=2, foreground="black")],
             )
             # inner-edge labels would collide with the next panel, so
             # RA lives on the bottom row and Dec on the left column
@@ -607,8 +599,8 @@ class FitsViewer(QMainWindow):
             [0.08, 0.025, 0.89, 0.08], label="histogram"
         )
         self.fig.subplots_adjust(
-            left=0.07, right=0.97, top=0.95, bottom=0.19,
-            hspace=0.22, wspace=0.15,
+            left=0.065, right=0.98, top=0.98, bottom=0.185,
+            hspace=0.12, wspace=0.10,
         )
         self._redraw_marks()
 
