@@ -57,7 +57,7 @@ euclid-cutouts 2026abc
 | `--full` | save the full product file instead of a cutout (needs `--download`) |
 | `-l` | list covering products without fetching |
 | `--pub` | write `euclid_collage_<ra>_<dec>.pdf` + `.png` at journal column size (vector text, 300 dpi) instead of displaying |
-| `--gui` | open the Qt image viewer instead of the static figure: band list, low/high cut sliders, stretch and colormap choice, histogram with draggable cut lines, RA/Dec or click crosshair |
+| `--gui` | open the Qt image viewer instead of the static figure: all images in a grid, per-image cut/stretch/colormap controls on the selected panel, toolbar and scroll-wheel zoom, histogram with draggable cut lines, shared crosshair by RA/Dec or click, centroid Recentre button |
 | `-o dir` | output directory for saved files (default: cwd); implies `--download` |
 | `--no-header-fix` | skip the keyword stamping |
 
