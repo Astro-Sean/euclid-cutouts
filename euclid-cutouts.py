@@ -682,6 +682,19 @@ def fetch_raw_band(band, schemas, ra, dec, radius_as, outdir, ref_path,
     return saved
 
 
+def confirm_outdir(outdir):
+    """Writing files straight into $HOME clutters it; make the user say so."""
+    if outdir != Path.home():
+        return
+    msg = f"output directory is your home directory ({outdir})"
+    if not sys.stdin.isatty():
+        tp.warn(f"{msg}; continuing (non-interactive)")
+        return
+    if not tp.ask(f"{msg} - save files here?"):
+        tp.info("aborted; pass -o DIR to pick another directory")
+        sys.exit(1)
+
+
 def print_product_table(products):
     tp.table(
         ["REL", "KIND", "BAND", "ID", "DIST(deg)", "FILE"],
@@ -928,6 +941,8 @@ def main():
         )
         return
 
+    if args.download or args.pub:
+        confirm_outdir(Path(args.outdir).expanduser().resolve())
     if args.download:
         outdir = Path(args.outdir).expanduser().resolve()
         outdir.mkdir(parents=True, exist_ok=True)
