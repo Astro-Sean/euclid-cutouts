@@ -52,6 +52,7 @@ euclid-cutouts 2026abc
 | `--include-raw` | for bands with no processed image, fetch raw detector frames and cut out the covering detector |
 | `--full` | save the full product file instead of a cutout (needs `--download`) |
 | `-l` | list covering products without fetching |
+| `--pub` | write `euclid_collage_<ra>_<dec>.pdf` + `.png` at journal column size (vector text, 300 dpi) instead of displaying |
 | `-o dir` | output directory for saved files (default: cwd); implies `--download` |
 | `--no-header-fix` | skip the keyword stamping |
 
