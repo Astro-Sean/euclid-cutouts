@@ -25,8 +25,10 @@ try:
         QGroupBox,
         QHBoxLayout,
         QLabel,
+        QLineEdit,
         QListWidget,
         QMainWindow,
+        QPushButton,
         QSlider,
         QVBoxLayout,
         QWidget,
@@ -41,8 +43,10 @@ except ImportError:
             QGroupBox,
             QHBoxLayout,
             QLabel,
+            QLineEdit,
             QListWidget,
             QMainWindow,
+            QPushButton,
             QSlider,
             QVBoxLayout,
             QWidget,
@@ -54,6 +58,8 @@ except ImportError:
         )
 
 import numpy as np
+from astropy import units as u
+from astropy.coordinates import SkyCoord
 from astropy.io import fits
 from astropy.visualization import (
     AsinhStretch,
@@ -84,6 +90,9 @@ STRETCHES = {
 # Cut presets, matching the DS9 Scale menu entries.
 PRESETS = ("zscale", "99%", "99.5%", "min/max")
 
+# Colormaps kept to perceptually sane options (no jet/rainbow).
+CMAPS = ("gray", "viridis", "plasma", "inferno", "magma", "bone")
+
 SLIDER_STEPS = 1000
 
 
@@ -106,6 +115,7 @@ class FitsViewer(QMainWindow):
         self._idx = 0
         self._drag = None  # 'lo'|'hi' while a histogram marker is held
         self._syncing = False  # guards slider setValue recursion
+        self._mark = None  # SkyCoord of the crosshair, or None
 
         self.fig = Figure(figsize=(8, 7))
         self.canvas = FigureCanvas(self.fig)
@@ -127,7 +137,7 @@ class FitsViewer(QMainWindow):
         self.setCentralWidget(central)
         self.statusBar().showMessage(f"{len(self._files)} file(s)")
 
-        self.canvas.mpl_connect("button_press_event", self._hist_press)
+        self.canvas.mpl_connect("button_press_event", self._canvas_press)
         self.canvas.mpl_connect("motion_notify_event", self._hist_drag)
         self.canvas.mpl_connect("button_release_event", self._hist_drop)
         self._load(0)
@@ -168,6 +178,17 @@ class FitsViewer(QMainWindow):
         self.preset_combo.addItems(PRESETS)
         self.preset_combo.activated.connect(self._apply_preset)
         row.addWidget(self.preset_combo)
+        zscale_btn = QPushButton("ZScale")
+        zscale_btn.clicked.connect(self._zscale)
+        row.addWidget(zscale_btn)
+        cbox.addLayout(row)
+
+        row = QHBoxLayout()
+        row.addWidget(QLabel("Colormap"))
+        self.cmap_combo = QComboBox()
+        self.cmap_combo.addItems(CMAPS)
+        self.cmap_combo.currentTextChanged.connect(self._refresh)
+        row.addWidget(self.cmap_combo)
         cbox.addLayout(row)
 
         self.lo_label = QLabel("low")
@@ -191,6 +212,26 @@ class FitsViewer(QMainWindow):
         row.addWidget(self.keep_check)
         cbox.addLayout(row)
         box.addWidget(contrast)
+
+        marker = QGroupBox("Crosshair")
+        mbox = QVBoxLayout(marker)
+        self.ra_edit = QLineEdit()
+        self.ra_edit.setPlaceholderText("RA (deg or hh:mm:ss)")
+        self.dec_edit = QLineEdit()
+        self.dec_edit.setPlaceholderText("Dec (deg or dd:mm:ss)")
+        mbox.addWidget(self.ra_edit)
+        mbox.addWidget(self.dec_edit)
+        row = QHBoxLayout()
+        mark_btn = QPushButton("Mark")
+        mark_btn.clicked.connect(self._mark_from_fields)
+        clear_btn = QPushButton("Clear")
+        clear_btn.clicked.connect(self._clear_mark)
+        row.addWidget(mark_btn)
+        row.addWidget(clear_btn)
+        mbox.addLayout(row)
+        self.click_check = QCheckBox("Click image to mark")
+        mbox.addWidget(self.click_check)
+        box.addWidget(marker)
         box.addStretch(1)
 
     def _load(self, idx):
@@ -242,6 +283,69 @@ class FitsViewer(QMainWindow):
         )
         self._draw()
 
+    def _zscale(self):
+        """One-click reset to zscale cuts, like the DS9 scale menu."""
+        self.preset_combo.setCurrentText("zscale")
+        self._apply_preset()
+
+    def _cmap(self):
+        name = self.cmap_combo.currentText()
+        return name + "_r" if self.invert_check.isChecked() else name
+
+    def _mark_from_fields(self):
+        ra_text = self.ra_edit.text().strip()
+        dec_text = self.dec_edit.text().strip()
+        if not dec_text:
+            # a pasted "ra,dec" or "ra dec" pair in the RA field
+            parts = ra_text.replace(",", " ").split()
+            if len(parts) == 2:
+                ra_text, dec_text = parts
+        text = f"{ra_text} {dec_text}"
+        coord = None
+        for units in ((u.deg, u.deg), (u.hourangle, u.deg), None):
+            try:
+                coord = (
+                    SkyCoord(text, unit=units)
+                    if units
+                    else SkyCoord(text)
+                )
+                break
+            except Exception:
+                continue
+        if coord is None:
+            self.statusBar().showMessage(
+                f"cannot parse position: {text!r}"
+            )
+            return
+        self._set_mark(coord)
+
+    def _set_mark(self, coord):
+        self._mark = coord
+        self.statusBar().showMessage(
+            f"crosshair at RA {coord.ra.deg:.7f}, Dec {coord.dec.deg:.7f}"
+        )
+        self._draw()
+
+    def _clear_mark(self):
+        self._mark = None
+        self._draw()
+
+    def _draw_mark(self):
+        if self._mark is None:
+            return
+        x, y = self.wcs.world_to_pixel(self._mark)
+        ny, nx = self.data.shape
+        if not (0 <= x < nx and 0 <= y < ny):
+            return  # target falls outside this image
+        r1, r2 = 0.015 * nx, 0.05 * nx
+        for dx, dy in ((0, 1), (0, -1), (1, 0), (-1, 0)):
+            self.ax_img.plot(
+                [x + dx * r1, x + dx * r2],
+                [y + dy * r1, y + dy * r2],
+                color="red",
+                lw=1.4,
+            )
+
     def _slider_cuts(self):
         if self._syncing:
             return
@@ -267,10 +371,11 @@ class FitsViewer(QMainWindow):
         self.ax_img.imshow(
             self.data,
             origin="lower",
-            cmap="gray_r" if self.invert_check.isChecked() else "gray",
+            cmap=self._cmap(),
             norm=self._norm(),
             interpolation="none",
         )
+        self._draw_mark()
         self.ax_img.coords.grid(True, color="cyan", alpha=0.3, ls=":")
         self.ax_img.coords["ra"].set_axislabel("RA", fontsize=10)
         self.ax_img.coords["dec"].set_axislabel("Dec", fontsize=10)
@@ -331,9 +436,7 @@ class FitsViewer(QMainWindow):
         norm.vmin, norm.vmax = lo, hi
         for artist in self.ax_img.images:
             artist.set_norm(norm)
-            artist.set_cmap(
-                "gray_r" if self.invert_check.isChecked() else "gray"
-            )
+            artist.set_cmap(self._cmap())
         if self._lo_line:
             self._lo_line.set_xdata([lo, lo])
         if self._hi_line:
@@ -346,27 +449,35 @@ class FitsViewer(QMainWindow):
         self.canvas.draw_idle()
 
     # --- histogram cut dragging (DS9 scale-window behaviour) ---
+    # --- plus click-to-mark on the image when enabled ---
 
     def _hist_value(self, event):
         if event.inaxes is not self.ax_hist or event.xdata is None:
             return None
         return float(event.xdata)
 
-    def _hist_press(self, event):
+    def _canvas_press(self, event):
         if event.button != 1:
             return
-        v = self._hist_value(event)
-        if v is None:
-            return
-        span = self.dmax - self.dmin or 1.0
-        self._drag = (
-            "lo" if abs(v - self._lo) <= abs(v - self._hi) else "hi"
-        )
-        if self._drag == "lo":
-            self._lo = v
-        else:
-            self._hi = v
-        self._refresh()
+        if event.inaxes is self.ax_hist:
+            v = self._hist_value(event)
+            if v is None:
+                return
+            self._drag = (
+                "lo" if abs(v - self._lo) <= abs(v - self._hi) else "hi"
+            )
+            if self._drag == "lo":
+                self._lo = v
+            else:
+                self._hi = v
+            self._refresh()
+        elif (
+            event.inaxes is self.ax_img
+            and self.click_check.isChecked()
+            and event.xdata is not None
+        ):
+            coord = self.wcs.pixel_to_world(event.xdata, event.ydata)
+            self._set_mark(coord)
 
     def _hist_drag(self, event):
         if self._drag not in ("lo", "hi"):
