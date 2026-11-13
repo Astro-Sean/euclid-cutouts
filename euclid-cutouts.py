@@ -1058,7 +1058,7 @@ def main():
             except SystemExit as err:
                 tp.die(str(err), 2)
             tp.info("close the viewer window to exit")
-            fits_viewer.show(paths)
+            fits_viewer.show(paths, coord)
             tp.info("Slán go fóill")
         else:
             import matplotlib
