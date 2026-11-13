@@ -42,6 +42,9 @@ flipped on load so every panel shows north up, east left. `--pub`
 - `utils/make_collage.py` - collage renderer. euclid-cutouts imports
   its `render()` for the default display mode; it also works
   standalone from the command line.
+- `utils/fits_viewer.py` - Qt (PySide6/PyQt6) image viewer used by
+  `--gui`: sidebar controls, matplotlib canvas, DS9-style contrast
+  (cut sliders, stretch combo, draggable histogram markers).
 - `utils/termprint.py` - dependency-free terminal output helpers ([ok]/
   [warn]/[error]/[info] tags, framed headers, tables, kv pairs). All
   console output goes through it; do not add bare print calls for
