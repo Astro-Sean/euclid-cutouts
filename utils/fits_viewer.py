@@ -890,8 +890,12 @@ class FitsViewer(QMainWindow):
             return
         idx, p = hit
         if self.click_check.isChecked() and event.xdata is not None:
+            # one-shot: mark this panel and untick so later clicks
+            # don't drag the crosshair around
+            self._set_active(idx)
             coord = p["wcs"].pixel_to_world(event.xdata, event.ydata)
             self._set_mark(coord)
+            self.click_check.setChecked(False)
         elif idx != self.active:
             self._set_active(idx)
 
