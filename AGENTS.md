@@ -9,7 +9,9 @@ https://github.com/Astro-Sean/euclid-cutouts
 ## What the project does
 
 `euclid-cutouts` is a terminal command that fetches Euclid archive FITS
-cutouts at a sky position. It queries the DR1/Q1 mosaic and
+cutouts at a sky position. The position argument also accepts an object
+name, resolved to coordinates through Sesame (SN/AT prefix variants are
+tried for transient-style names). It queries the DR1/Q1 mosaic and
 observation-stack footprint tables, fetches one cutout per band, and
 displays them in a collage figure. `--download` saves the files and
 stamps the header keywords AutoPhOT needs at ingest: TELESCOP,
