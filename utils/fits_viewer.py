@@ -19,6 +19,7 @@ from pathlib import Path
 try:
     from PySide6.QtCore import Qt
     from PySide6.QtWidgets import (
+        QAbstractItemView,
         QApplication,
         QCheckBox,
         QComboBox,
@@ -38,6 +39,7 @@ except ImportError:
     try:
         from PyQt6.QtCore import Qt
         from PyQt6.QtWidgets import (
+            QAbstractItemView,
             QApplication,
             QCheckBox,
             QComboBox,
@@ -127,6 +129,7 @@ class FitsViewer(QMainWindow):
         self.active = 0
         self._drag = None  # 'lo'|'hi' while a histogram marker is held
         self._syncing = False  # guards widget setValue recursion
+        self._syncing = False  # widget updates feeding back to state
         self._mark = None  # SkyCoord of the crosshair, or None
         self._mark_scale = 1.0  # tick length factor from the slider
         self._mark_color = "red"
@@ -226,11 +229,23 @@ class FitsViewer(QMainWindow):
         box.addWidget(title)
 
         self.image_list = QListWidget()
+        self.image_list.setSelectionMode(
+            QAbstractItemView.SelectionMode.ExtendedSelection
+        )
         for f in self._files:
             self.image_list.addItem(Path(f).name)
         self.image_list.setCurrentRow(0)
         self.image_list.currentRowChanged.connect(self._set_active)
         box.addWidget(self.image_list, stretch=1)
+        self.show_sel = QCheckBox("Selected only")
+        self.show_sel.setToolTip(
+            "Show just the rows selected above (Ctrl-click for several)"
+        )
+        self.show_sel.toggled.connect(self._filter_panels)
+        self.image_list.itemSelectionChanged.connect(
+            self._selection_changed
+        )
+        box.addWidget(self.show_sel)
 
         contrast = QGroupBox("Contrast")
         cbox = QVBoxLayout(contrast)
@@ -445,8 +460,15 @@ class FitsViewer(QMainWindow):
             return
         p = self._panel()
         p["stretch"] = self.stretch_combo.currentText()
-        p["cmap"] = self.cmap_combo.currentText()
-        p["invert"] = self.invert_check.isChecked()
+        # colormap and inversion read as one palette - they apply to
+        # every panel, not just the one being edited
+        cmap = self.cmap_combo.currentText()
+        invert = self.invert_check.isChecked()
+        for q in self.panels:
+            q["cmap"] = cmap
+            q["invert"] = invert
+            if q["im"] is not None:
+                q["im"].set_cmap(self._cmap_for(q))
         self._apply_norm(p)
         lo, hi = sorted((p["lo"], p["hi"]))
         if self._lo_line is not None:
@@ -472,14 +494,38 @@ class FitsViewer(QMainWindow):
 
     # --- figure ---
 
+    def _visible(self):
+        """Panel indices shown in the grid."""
+        if self.show_sel.isChecked():
+            rows = {i.row() for i in self.image_list.selectedIndexes()}
+            if rows:
+                return sorted(rows)
+        return list(range(len(self.panels)))
+
+    def _selection_changed(self):
+        if not self._syncing and self.show_sel.isChecked():
+            self._filter_panels()
+
+    def _filter_panels(self, *_):
+        self._draw()
+        idx = self.active
+        if self.panels[idx]["ax"] is None:
+            idx = self._visible()[0]
+        self._set_active(idx)
+
     def _draw(self):
         self.fig.clf()
-        n = len(self.panels)
+        for p in self.panels:
+            p["ax"] = p["im"] = None
+        visible = self._visible()
+        n = len(visible)
         cols = math.ceil(math.sqrt(n))
         rows = math.ceil(n / cols)
-        for i, p in enumerate(self.panels):
+        for k, i in enumerate(visible):
+            p = self.panels[i]
+            row, col = divmod(k, cols)
             ax = self.fig.add_subplot(
-                rows, cols, i + 1, projection=p["wcs"], label=f"img{i}"
+                rows, cols, k + 1, projection=p["wcs"], label=f"img{i}"
             )
             p["ax"] = ax
             p["im"] = ax.imshow(
@@ -493,8 +539,16 @@ class FitsViewer(QMainWindow):
             for axis in ("ra", "dec"):
                 ax.coords[axis].set_ticklabel(size=7)
             ax.set_title(p["band"], fontsize=9, loc="left")
-            for axis, label in (("ra", "RA"), ("dec", "Dec")):
-                ax.coords[axis].set_axislabel(label)
+            # inner-edge labels would collide with the next panel, so
+            # RA lives on the bottom row and Dec on the left column
+            if row < rows - 1:
+                ax.coords["ra"].set_ticklabel_visible(False)
+            else:
+                ax.coords["ra"].set_axislabel("RA")
+            if col > 0:
+                ax.coords["dec"].set_ticklabel_visible(False)
+            else:
+                ax.coords["dec"].set_axislabel("Dec")
             ax.callbacks.connect("xlim_changed", self._view_sync)
             ax.callbacks.connect("ylim_changed", self._view_sync)
 
