@@ -11,13 +11,14 @@ applied between the cuts and the colormap, and preset cut algorithms
 Usage: fits_viewer.py image1.fits [image2.fits ...]
 """
 
+import signal
 import sys
 from pathlib import Path
 
 # PySide6 first, PyQt6 fallback - same import order as RISOTTO, and
 # Qt must be in before matplotlib so the canvas picks the same binding.
 try:
-    from PySide6.QtCore import Qt
+    from PySide6.QtCore import Qt, QTimer
     from PySide6.QtWidgets import (
         QAbstractItemView,
         QApplication,
@@ -37,7 +38,7 @@ try:
     )
 except ImportError:
     try:
-        from PyQt6.QtCore import Qt
+        from PyQt6.QtCore import Qt, QTimer
         from PyQt6.QtWidgets import (
             QAbstractItemView,
             QApplication,
@@ -151,6 +152,7 @@ class FitsViewer(QMainWindow):
         self._mark_lines = []
         self._panning = False  # re-entrant guard for linked views
         self._lo_line = self._hi_line = None  # histogram cut markers
+        self._clines = {}  # per-panel cut markers on the histogram
 
         self.panels = [self._load_panel(f) for f in self._files]
 
@@ -489,10 +491,19 @@ class FitsViewer(QMainWindow):
         if self._lo_line is not None:
             span = p["hmax"] - p["hmin"] or 1.0
             self._lo_line.set_xdata(
-                [(lo - p["hmin"]) / span] * 2
+                [np.clip((lo - p["hmin"]) / span, 0, 1)] * 2
             )
             self._hi_line.set_xdata(
-                [(hi - p["hmin"]) / span] * 2
+                [np.clip((hi - p["hmin"]) / span, 0, 1)] * 2
+            )
+        for i, (lo_l, hi_l) in self._clines.items():
+            q = self.panels[i]
+            span_q = q["hmax"] - q["hmin"] or 1.0
+            lo_l.set_xdata(
+                [np.clip((q["lo"] - q["hmin"]) / span_q, 0, 1)] * 2
+            )
+            hi_l.set_xdata(
+                [np.clip((q["hi"] - q["hmin"]) / span_q, 0, 1)] * 2
             )
         self._sync_sliders()
         self.canvas.draw_idle()
@@ -653,12 +664,27 @@ class FitsViewer(QMainWindow):
         self.ax_hist.set_yticks([])
         for spine in self.ax_hist.spines.values():
             spine.set_linewidth(0.5)
+        # every panel's own cut positions, in its band colour
+        self._clines = {}
+        for i, q in enumerate(self.panels):
+            span_q = q["hmax"] - q["hmin"] or 1.0
+            color = BAND_COLOR.get(band_label(q["band"]), "0.5")
+            flo = np.clip((q["lo"] - q["hmin"]) / span_q, 0, 1)
+            fhi = np.clip((q["hi"] - q["hmin"]) / span_q, 0, 1)
+            self._clines[i] = (
+                self.ax_hist.axvline(
+                    flo, color=color, lw=0.8, alpha=0.7, ls=":"
+                ),
+                self.ax_hist.axvline(
+                    fhi, color=color, lw=0.8, alpha=0.7, ls=":"
+                ),
+            )
         self._lo_line = self.ax_hist.axvline(
-            (p["lo"] - p["hmin"]) / span,
+            np.clip((p["lo"] - p["hmin"]) / span, 0, 1),
             color="green", lw=1.2, picker=6,
         )
         self._hi_line = self.ax_hist.axvline(
-            (p["hi"] - p["hmin"]) / span,
+            np.clip((p["hi"] - p["hmin"]) / span, 0, 1),
             color="red", lw=1.2, picker=6,
         )
         self.ax_hist.legend(
@@ -839,8 +865,12 @@ class FitsViewer(QMainWindow):
             # range - convert back to a data value before storing
             span = p["hmax"] - p["hmin"] or 1.0
             v = p["hmin"] + float(event.xdata) * span
+            flo = np.clip((p["lo"] - p["hmin"]) / span, 0, 1)
+            fhi = np.clip((p["hi"] - p["hmin"]) / span, 0, 1)
             self._drag = (
-                "lo" if abs(v - p["lo"]) <= abs(v - p["hi"]) else "hi"
+                "lo"
+                if abs(event.xdata - flo) <= abs(event.xdata - fhi)
+                else "hi"
             )
             if self._drag == "lo":
                 p["lo"] = v
@@ -888,20 +918,27 @@ class FitsViewer(QMainWindow):
         if event.inaxes is not self.ax_hist or event.xdata is None:
             return
         p = self._panel()
+        v = p["hmin"] + float(event.xdata) * (
+            p["hmax"] - p["hmin"] or 1.0
+        )
         if self._drag == "lo":
-            p["lo"] = float(event.xdata)
+            p["lo"] = v
         else:
-            p["hi"] = float(event.xdata)
+            p["hi"] = v
         self._refresh()
 
     def _hist_drop(self, _event):
         self._drag = None
 
     def keyPressEvent(self, event):
-        if event.key() == Qt.Key.Key_Left:
-            self._set_active((self.active - 1) % len(self.panels))
-        elif event.key() == Qt.Key.Key_Right:
-            self._set_active((self.active + 1) % len(self.panels))
+        if event.key() in (Qt.Key.Key_Left, Qt.Key.Key_Right):
+            step = -1 if event.key() == Qt.Key.Key_Left else 1
+            idx = self.active
+            for _ in range(len(self.panels)):
+                idx = (idx + step) % len(self.panels)
+                if self.panels[idx]["ax"] is not None:
+                    self._set_active(idx)
+                    break
         elif event.key() == Qt.Key.Key_I:
             self.invert_check.toggle()
         elif event.key() == Qt.Key.Key_C:
@@ -916,7 +953,18 @@ def show(files):
     win = FitsViewer(files)
     win.resize(900, 800)
     win.show()
-    app.exec()
+    # the Qt loop blocks interpreter wakeups; a periodic no-op timer
+    # gives Python control so the SIGINT handler can run - Ctrl+C in
+    # the terminal quits the app instead of hanging the shell
+    timer = QTimer(win)
+    timer.timeout.connect(lambda: None)
+    timer.start(250)
+    previous = signal.getsignal(signal.SIGINT)
+    signal.signal(signal.SIGINT, lambda *_: app.quit())
+    try:
+        app.exec()
+    finally:
+        signal.signal(signal.SIGINT, previous)
 
 
 def main():
