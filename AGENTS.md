@@ -30,7 +30,9 @@ flux, not for photometry without full reduction.
 FITS file: ZScale stretch, no interpolation, a 5-arcsecond zoomed inset
 with notch markers on the target, an N/E compass bottom-right, a band
 label top-left, and the product id bottom-left. Mirrored images are
-flipped on load so every panel shows north up, east left.
+flipped on load so every panel shows north up, east left. `--pub`
+(aanda/apj/mnras widths) exports a vector PDF with rasterized images +
+300-dpi PNG instead of the screen figure.
 
 ## File map
 
