@@ -52,7 +52,7 @@ def add_compass(ax, wcs, shape, color="red"):
         vectors[label] = vec / np.abs(vec).max()
 
     arm = 0.08
-    label_arm = 1.8 * arm
+    label_arm = 1.35 * arm
     origin = np.array([0.90, 0.10])
     tips = np.array([origin + arm * v for v in vectors.values()])
     lbls = np.array([origin + label_arm * v for v in vectors.values()])
