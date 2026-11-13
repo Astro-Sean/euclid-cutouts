@@ -60,6 +60,8 @@ flipped on load so every panel shows north up, east left.
   by" lines.
 - Keep `README.md` in sync with the code. A new flag, option, or
   behavior change must come with a README update describing it.
+- Never commit real target names, positions, or data from ongoing work.
+  Docs and examples use the EDF-S demo position and placeholder names.
 - Commit messages: short imperative subject, body explains why.
 - Plain ASCII only. No emojis, smart quotes, or em/en dashes.
 
