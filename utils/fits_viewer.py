@@ -22,6 +22,7 @@ try:
         QApplication,
         QCheckBox,
         QComboBox,
+        QFileDialog,
         QGroupBox,
         QHBoxLayout,
         QLabel,
@@ -40,6 +41,7 @@ except ImportError:
             QApplication,
             QCheckBox,
             QComboBox,
+            QFileDialog,
             QGroupBox,
             QHBoxLayout,
             QLabel,
@@ -83,6 +85,10 @@ from scipy import ndimage
 
 # Stretch functions between the cut range and the colormap. "zscale"
 # is DS9-style: linear display over zscale cuts, reapplied on select.
+# Recentre never jumps across the field: a centroid further than this
+# (pixels) from the crosshair is a different source, not a correction.
+RECENTRE_MAX_PX = 6.0
+
 STRETCHES = {
     "zscale": LinearStretch(),
     "asinh": AsinhStretch(a=0.1),
@@ -123,7 +129,9 @@ class FitsViewer(QMainWindow):
         self._syncing = False  # guards widget setValue recursion
         self._mark = None  # SkyCoord of the crosshair, or None
         self._mark_scale = 1.0  # tick length factor from the slider
+        self._mark_color = "red"
         self._mark_lines = []
+        self._panning = False  # re-entrant guard for linked views
         self._lo_line = self._hi_line = None  # histogram cut markers
 
         self.panels = [self._load_panel(f) for f in self._files]
@@ -171,6 +179,7 @@ class FitsViewer(QMainWindow):
             hdr["CD1_1"], hdr["CD1_2"] = -ps[0, 0], ps[0, 1]
             hdr["CD2_1"], hdr["CD2_2"] = -ps[1, 0], ps[1, 1]
             wcs = WCS(hdr).celestial
+        sxy = proj_plane_pixel_scales(wcs)
         finite = data[np.isfinite(data)]
         dmin, dmax = float(finite.min()), float(finite.max())
         # the histogram displays the data bulk; the full dmin-dmax
@@ -194,6 +203,8 @@ class FitsViewer(QMainWindow):
             "edges": edges,
             "lo": lo,
             "hi": hi,
+            "sx": float(sxy[0]),  # deg/pix, for linked views
+            "sy": float(sxy[1]),
             "stretch": "zscale",
             "preset": "zscale",
             "cmap": "gray",
@@ -306,7 +317,22 @@ class FitsViewer(QMainWindow):
         self.mark_slider.valueChanged.connect(self._mark_size)
         mbox.addWidget(self.mark_label)
         mbox.addWidget(self.mark_slider)
+        crow = QHBoxLayout()
+        crow.addWidget(QLabel("colour"))
+        self.color_combo = QComboBox()
+        self.color_combo.addItems(
+            ["red", "cyan", "green", "yellow", "magenta", "white"]
+        )
+        self.color_combo.currentTextChanged.connect(self._mark_colour)
+        crow.addWidget(self.color_combo)
+        mbox.addLayout(crow)
         box.addWidget(marker)
+        save_btn = QPushButton("Save figure")
+        save_btn.setToolTip(
+            "Write the image grid to a PNG or PDF file"
+        )
+        save_btn.clicked.connect(self._save)
+        box.addWidget(save_btn)
         box.addStretch(1)
 
     def _panel(self):
@@ -469,15 +495,56 @@ class FitsViewer(QMainWindow):
             ax.set_title(p["band"], fontsize=9, loc="left")
             for axis, label in (("ra", "RA"), ("dec", "Dec")):
                 ax.coords[axis].set_axislabel(label)
+            ax.callbacks.connect("xlim_changed", self._view_sync)
+            ax.callbacks.connect("ylim_changed", self._view_sync)
 
         self.ax_hist = self.fig.add_axes(
             [0.09, 0.03, 0.88, 0.09], label="histogram"
         )
         self.fig.subplots_adjust(
-            left=0.07, right=0.98, top=0.94, bottom=0.16,
-            hspace=0.35, wspace=0.3,
+            left=0.06, right=0.97, top=0.955, bottom=0.15,
+            hspace=0.12, wspace=0.08,
         )
         self._redraw_marks()
+
+    def _view_sync(self, src_ax):
+        """Reapply one panel's sky view to every panel.
+
+        Limits are matched in world units, so a pan or zoom keeps all
+        images centred on the same sky position at the same angular
+        scale regardless of their pixel sampling.
+        """
+        if self._panning:
+            return
+        src = next(
+            (p for p in self.panels if p["ax"] is src_ax), None
+        )
+        if src is None:
+            return
+        self._panning = True
+        try:
+            xl, xr = src_ax.get_xlim()
+            yb, yt = src_ax.get_ylim()
+            world = src["wcs"].pixel_to_world(
+                (xl + xr) / 2, (yb + yt) / 2
+            )
+            wx = abs(xr - xl) * src["sx"]
+            wy = abs(yt - yb) * src["sy"]
+            for p in self.panels:
+                if p["ax"] is None or p["ax"] is src_ax:
+                    continue
+                x, y = np.asarray(
+                    p["wcs"].world_to_pixel(world)
+                ).ravel()
+                p["ax"].set_xlim(
+                    x - wx / (2 * p["sx"]), x + wx / (2 * p["sx"])
+                )
+                p["ax"].set_ylim(
+                    y - wy / (2 * p["sy"]), y + wy / (2 * p["sy"])
+                )
+        finally:
+            self._panning = False
+        self.canvas.draw_idle()
 
     def _draw_hist(self):
         p = self._panel()
@@ -563,14 +630,14 @@ class FitsViewer(QMainWindow):
                 ny, nx = p["data"].shape
                 if not (0 <= x < nx and 0 <= y < ny):
                     continue
-                r1 = 0.02 * nx * self._mark_scale
-                r2 = 0.06 * nx * self._mark_scale
+                r1 = 0.012 * nx * self._mark_scale
+                r2 = 0.035 * nx * self._mark_scale
                 for dx, dy in ((0, 1), (0, -1), (1, 0), (-1, 0)):
                     (line,) = p["ax"].plot(
                         [x + dx * r1, x + dx * r2],
                         [y + dy * r1, y + dy * r2],
-                        color="red",
-                        lw=1.4,
+                        color=self._mark_color,
+                        lw=0.9,
                     )
                     self._mark_lines.append(line)
         self.canvas.draw_idle()
@@ -579,6 +646,27 @@ class FitsViewer(QMainWindow):
         self._mark_scale = value / 100.0
         self.mark_label.setText(f"crosshair size: {value}%")
         self._redraw_marks()
+
+    def _mark_colour(self, name):
+        self._mark_color = name
+        self._redraw_marks()
+
+    def _save(self):
+        path, _ = QFileDialog.getSaveFileName(
+            self,
+            "Save figure",
+            "euclid_viewer.png",
+            "PNG image (*.png);;PDF document (*.pdf)",
+        )
+        if not path:
+            return
+        self.ax_hist.set_visible(False)
+        try:
+            self.fig.savefig(path, dpi=200)
+        finally:
+            self.ax_hist.set_visible(True)
+            self.canvas.draw_idle()
+        self.statusBar().showMessage(f"saved {path}")
 
     def _recentre(self):
         """Centroid the source nearest the crosshair on the active panel."""
@@ -607,6 +695,15 @@ class FitsViewer(QMainWindow):
             )
             return
         cy, cx = ndimage.center_of_mass(sub, mask, 1)
+        # a centroid landing far off means a different source was
+        # caught, not a refinement - keep the mark where it is
+        dist = math.hypot(x1 + cx - x, y1 + cy - y)
+        if dist > RECENTRE_MAX_PX:
+            self.statusBar().showMessage(
+                f"nearest peak {dist * scale:.1f} arcsec away - "
+                "too far to recentre"
+            )
+            return
         coord = p["wcs"].pixel_to_world(x1 + cx, y1 + cy)
         self.statusBar().showMessage(
             f"re-centred: RA {coord.ra.deg:.7f}, Dec {coord.dec.deg:.7f}"
