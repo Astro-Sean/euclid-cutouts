@@ -16,7 +16,7 @@ Examples:
     euclid-cutouts 60.34 -49.93 -r 60 -b VIS,NIR_Y
     euclid-cutouts 60.34 -49.93 --list
     euclid-cutouts 60.34 -49.93 --include-raw   # raw detector cutouts too
-    euclid-cutouts 2024pba                      # name resolved via Sesame
+    euclid-cutouts 2026abc                      # name resolved via Sesame
 """
 
 import argparse
@@ -125,7 +125,7 @@ def parse_position(tokens):
 
 
 def _name_variants(name):
-    """SIMBAD alias guesses for a transient name like '2024pba'."""
+    """SIMBAD alias guesses for a transient name like '2026abc'."""
     variants = [name]
     match = re.match(r"^(?:SN|AT)\s*(\d{4}[A-Za-z]+)$", name, re.IGNORECASE)
     if match:
@@ -150,7 +150,7 @@ def resolve_name(name):
     """Resolve an object name to ICRS degrees via Sesame.
 
     Sesame checks SIMBAD, NED and VizieR in one query. TNS names like
-    2024pba are catalogued under SN/AT prefixes, so each spelling variant
+    2026abc are catalogued under SN/AT prefixes, so each spelling variant
     is tried in turn. Returns (ra, dec, variant) or None.
     """
     tp.info(f"resolving {name!r} via Sesame ...")
@@ -720,7 +720,7 @@ def main():
         "coords",
         nargs="+",
         help="RA Dec in degrees, 'ra,dec', a sexagesimal string, or an "
-        "object name resolved via Sesame (e.g. 2024pba)",
+        "object name resolved via Sesame (e.g. 2026abc)",
     )
     parser.add_argument(
         "-r",
