@@ -17,6 +17,10 @@ pip install -r requirements.txt
 ln -s "$(pwd)/euclid-cutouts.py" ~/.local/bin/euclid-cutouts
 ```
 
+The `--gui` viewer additionally needs PySide6 or PyQt6
+(`pip install pyside6`); it also runs standalone:
+`python3 utils/fits_viewer.py image1.fits image2.fits ...`
+
 ## Usage
 
 ```bash
@@ -53,6 +57,7 @@ euclid-cutouts 2026abc
 | `--full` | save the full product file instead of a cutout (needs `--download`) |
 | `-l` | list covering products without fetching |
 | `--pub` | write `euclid_collage_<ra>_<dec>.pdf` + `.png` at journal column size (vector text, 300 dpi) instead of displaying |
+| `--gui` | open the Qt image viewer instead of the static figure: band list, low/high cut sliders, stretch (asinh/log/sqrt/linear), histogram with draggable cut lines |
 | `-o dir` | output directory for saved files (default: cwd); implies `--download` |
 | `--no-header-fix` | skip the keyword stamping |
 
