@@ -67,6 +67,7 @@ import numpy as np
 from astropy import units as u
 from astropy.coordinates import SkyCoord
 from astropy.io import fits
+from astropy.stats import sigma_clipped_stats
 from astropy.visualization import (
     AsinhStretch,
     ImageNormalize,
@@ -741,23 +742,38 @@ class FitsViewer(QMainWindow):
         if sub.size == 0:
             self.statusBar().showMessage("crosshair is off this image")
             return
-        med, std = np.nanmedian(sub), np.nanstd(sub)
-        mask = sub > med + 3 * std
-        if mask.sum() < 4:
+        _, med, std = sigma_clipped_stats(sub, sigma=3.0)
+        labels, nlab = ndimage.label(
+            np.isfinite(sub) & (sub > med + 3.0 * std)
+        )
+        if nlab == 0:
             self.statusBar().showMessage(
                 "no source found near the crosshair"
             )
             return
-        cy, cx = ndimage.center_of_mass(sub, mask, 1)
-        # a centroid landing far off means a different source was
-        # caught, not a refinement - keep the mark where it is
-        dist = math.hypot(x1 + cx - x, y1 + cy - y)
-        if dist > RECENTRE_MAX_PX:
-            self.statusBar().showMessage(
-                f"nearest peak {dist * scale:.1f} arcsec away - "
-                "too far to recentre"
+        # centroid the blob the crosshair sits on; on blank sky, the
+        # blob whose centroid is closest to the mark
+        lx, ly = int(round(x)) - x1, int(round(y)) - y1
+        lab = 0
+        if 0 <= ly < sub.shape[0] and 0 <= lx < sub.shape[1]:
+            lab = labels[ly, lx]
+        if lab == 0:
+            coms = np.asarray(
+                ndimage.center_of_mass(sub, labels, range(1, nlab + 1))
             )
-            return
+            d = np.hypot(
+                coms[:, 0] - (y - y1), coms[:, 1] - (x - x1)
+            )
+            lab = int(np.argmin(d)) + 1
+            if d.min() > RECENTRE_MAX_PX:
+                self.statusBar().showMessage(
+                    f"nearest peak {d.min() * scale:.1f} arcsec away - "
+                    "too far to recentre"
+                )
+                return
+        cy, cx = ndimage.center_of_mass(sub, labels, lab)
+        # inside a blob, its centroid is the answer however far it
+        # sits - the cap above only guards the blank-sky fallback
         coord = p["wcs"].pixel_to_world(x1 + cx, y1 + cy)
         self.statusBar().showMessage(
             f"re-centred: RA {coord.ra.deg:.7f}, Dec {coord.dec.deg:.7f}"
