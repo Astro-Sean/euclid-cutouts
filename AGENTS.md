@@ -43,8 +43,9 @@ flipped on load so every panel shows north up, east left. `--pub`
   its `render()` for the default display mode; it also works
   standalone from the command line.
 - `utils/fits_viewer.py` - Qt (PySide6/PyQt6) image viewer used by
-  `--gui`: sidebar controls, matplotlib canvas, DS9-style contrast
-  (cut sliders, stretch combo, draggable histogram markers).
+  `--gui`: all images in a grid, sidebar controls editing the selected
+  panel (per-image cuts, stretch, colormap), shared sky crosshair with
+  centroid recentring, toolbar plus scroll-wheel zoom.
 - `utils/termprint.py` - dependency-free terminal output helpers ([ok]/
   [warn]/[error]/[info] tags, framed headers, tables, kv pairs). All
   console output goes through it; do not add bare print calls for
