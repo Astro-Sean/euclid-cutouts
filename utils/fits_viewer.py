@@ -140,7 +140,7 @@ def preset_cuts(data, preset):
 class FitsViewer(QMainWindow):
     """Grid of FITS panels; contrast controls edit the active panel."""
 
-    def __init__(self, files):
+    def __init__(self, files, mark=None):
         super().__init__()
         self.setWindowTitle("euclid-cutouts viewer")
         self._files = [str(f) for f in files]
@@ -148,7 +148,7 @@ class FitsViewer(QMainWindow):
         self._drag = None  # 'lo'|'hi' while a histogram marker is held
         self._syncing = False  # guards widget setValue recursion
         self._syncing = False  # widget updates feeding back to state
-        self._mark = None  # SkyCoord of the crosshair, or None
+        self._mark = mark  # SkyCoord of the crosshair, or None
         self._mark_scale = 1.0  # tick length factor from the slider
         self._mark_color = "red"
         self._mark_lines = []
@@ -968,10 +968,14 @@ class FitsViewer(QMainWindow):
             super().keyPressEvent(event)
 
 
-def show(files):
-    """Open the viewer window on `files`. Blocks until it closes."""
+def show(files, mark=None):
+    """Open the viewer window on `files`. Blocks until it closes.
+
+    `mark` is an optional SkyCoord drawn as the crosshair on open -
+    euclid-cutouts passes the search position.
+    """
     app = QApplication.instance() or QApplication(sys.argv)
-    win = FitsViewer(files)
+    win = FitsViewer(files, mark)
     win.resize(900, 800)
     win.show()
     # the Qt loop blocks interpreter wakeups; a periodic no-op timer
