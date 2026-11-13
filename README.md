@@ -28,7 +28,14 @@ is kept on disk unless `--download` is given. With no display
 available, the figure is written to `euclid_collage_<ra>_<dec>.png`
 instead.
 
-Coordinates work as `ra dec`, `ra,dec`, or a sexagesimal string.
+Coordinates work as `ra dec`, `ra,dec`, or a sexagesimal string. A
+non-coordinate argument is treated as an object name and resolved
+through Sesame (SIMBAD, NED, VizieR); transient names like `2024pba`
+are tried under the SN and AT prefixes automatically.
+
+```bash
+euclid-cutouts 2024pba
+```
 
 ![DR1 mosaic cutouts in VIS and NIR Y/J/H at RA 60.3372991, Dec -49.9318588](example_collage.png)
 
