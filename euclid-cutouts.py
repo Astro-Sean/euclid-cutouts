@@ -16,6 +16,7 @@ Examples:
     euclid-cutouts 60.34 -49.93 -r 60 -b VIS,NIR_Y
     euclid-cutouts 60.34 -49.93 --list
     euclid-cutouts 60.34 -49.93 --include-raw   # raw detector cutouts too
+    euclid-cutouts 2024pba                      # name resolved via Sesame
 """
 
 import argparse
@@ -121,6 +122,49 @@ def parse_position(tokens):
         except Exception:
             continue
     raise ValueError(f"cannot parse position: {' '.join(tokens)!r}")
+
+
+def _name_variants(name):
+    """SIMBAD alias guesses for a transient name like '2024pba'."""
+    variants = [name]
+    match = re.match(r"^(?:SN|AT)\s*(\d{4}[A-Za-z]+)$", name, re.IGNORECASE)
+    if match:
+        core = match.group(1)
+    elif re.match(r"^\d{4}[A-Za-z]+$", name):
+        core = name
+    else:
+        core = None
+    if core:
+        variants.append(core)
+        for prefix in ("SN", "AT"):
+            variants += [f"{prefix} {core}", f"{prefix}{core}"]
+    seen, out = set(), []
+    for variant in variants:
+        if variant not in seen:
+            seen.add(variant)
+            out.append(variant)
+    return out
+
+
+def resolve_name(name):
+    """Resolve an object name to ICRS degrees via Sesame.
+
+    Sesame checks SIMBAD, NED and VizieR in one query. TNS names like
+    2024pba are catalogued under SN/AT prefixes, so each spelling variant
+    is tried in turn. Returns (ra, dec, variant) or None.
+    """
+    tp.info(f"resolving {name!r} via Sesame ...")
+    for variant in _name_variants(name):
+        try:
+            coord = SkyCoord.from_name(variant, cache=False)
+        except Exception:
+            continue
+        tp.ok(
+            f"{name!r} -> {variant!r}: "
+            f"RA {coord.ra.deg:.7f}, Dec {coord.dec.deg:.7f}"
+        )
+        return coord.ra.deg, coord.dec.deg, variant
+    return None
 
 
 def parse_bands(text):
@@ -675,7 +719,8 @@ def main():
     parser.add_argument(
         "coords",
         nargs="+",
-        help="RA Dec in degrees, 'ra,dec', or a sexagesimal string",
+        help="RA Dec in degrees, 'ra,dec', a sexagesimal string, or an "
+        "object name resolved via Sesame (e.g. 2024pba)",
     )
     parser.add_argument(
         "-r",
@@ -763,8 +808,17 @@ def main():
 
     try:
         ra, dec = parse_position(args.coords)
-    except ValueError as err:
-        tp.die(str(err), 2)
+        target_name = None
+    except ValueError:
+        target_name = " ".join(args.coords)
+        resolved = resolve_name(target_name)
+        if resolved is None:
+            tp.die(
+                f"cannot parse position: {target_name!r} "
+                f"(not a coordinate, and no catalog match)",
+                2,
+            )
+        ra, dec, _ = resolved
 
     if args.radius is not None and args.size is not None:
         tp.die("use only one of --radius and --size", 2)
@@ -787,6 +841,8 @@ def main():
     schemas = ["dr1", "q1"] if args.release == "both" else [args.release]
 
     tp.header("Euclid archive cutouts")
+    if target_name:
+        tp.kv("Target", target_name)
     tp.kv("Position", f"RA {ra:.7f}, Dec {dec:.7f}")
     tp.kv(
         "Radius",
