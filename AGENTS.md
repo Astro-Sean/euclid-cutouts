@@ -45,9 +45,11 @@ flipped on load so every panel shows north up, east left. `--pub`
 - `utils/fits_viewer.py` - Qt (PySide6/PyQt6) image viewer used by
   `--gui`: all images in a grid with linked sky views (pan/zoom one
   panel, all follow in world coordinates), sidebar controls editing
-  the selected panel (per-image cuts, stretch, colormap), shared sky
-  crosshair with size/colour controls and centroid recentring capped
-  at 6 px, toolbar plus scroll-wheel zoom, figure export.
+  the selected panel (per-image cuts and stretch; colormap applies
+  to the whole grid), a selected-only filter driven by the list,
+  shared sky crosshair with size/colour controls and centroid
+  recentring capped at 6 px, toolbar plus scroll-wheel zoom, figure
+  export.
 - `utils/termprint.py` - dependency-free terminal output helpers ([ok]/
   [warn]/[error]/[info] tags, framed headers, tables, kv pairs). All
   console output goes through it; do not add bare print calls for
