@@ -94,6 +94,40 @@ def add_compass(ax, wcs, shape, color="red"):
         )
 
 
+# Journal column widths in mm (single, double). A&A is the default for
+# Euclid work; apj and mnras differ only in width.
+JOURNAL_WIDTHS = {
+    "aanda": (88.0, 180.0),
+    "apj": (88.0, 185.0),
+    "mnras": (84.0, 178.0),
+}
+
+
+def _apply_pub_style(journal):
+    """Set rcParams for journal output. Returns (single, double) mm."""
+    if journal not in JOURNAL_WIDTHS:
+        raise ValueError(
+            f"unknown journal {journal!r}; pick from "
+            f"{', '.join(JOURNAL_WIDTHS)}"
+        )
+    plt.rcParams.update(
+        {
+            "font.family": "sans-serif",
+            "font.sans-serif": ["Liberation Sans", "Arial", "DejaVu Sans"],
+            "font.size": 7,
+            "axes.linewidth": 0.6,
+            "xtick.direction": "in",
+            "ytick.direction": "in",
+            "xtick.major.size": 3,
+            "ytick.major.size": 3,
+            "pdf.fonttype": 42,
+            "ps.fonttype": 42,
+            "svg.fonttype": "none",
+        }
+    )
+    return JOURNAL_WIDTHS[journal]
+
+
 def nice_scale_arcsec(field_as):
     """Largest round-number scale bar that stays well inside the field."""
     for s in (60, 30, 20, 10, 5, 2, 1):
@@ -136,7 +170,9 @@ def add_scalebar(ax, arcsec, scale_as, shape, color="yellow", native_as=None):
     )
 
 
-def add_zoom_inset(ax, data, x0, y0, norm, scale_as, color="red"):
+def add_zoom_inset(
+    ax, data, x0, y0, norm, scale_as, color="red", rasterized=False
+):
     """Top-right inset showing a 5-arcsec-wide zoom centred on the target."""
     ny, nx = data.shape
     sx, sy = scale_as
@@ -155,6 +191,7 @@ def add_zoom_inset(ax, data, x0, y0, norm, scale_as, color="red"):
     axins.imshow(
         crop,
         origin="lower",
+        rasterized=rasterized,
         cmap="gray",
         norm=norm,
         interpolation="none",
@@ -230,17 +267,23 @@ def band_sort_key(path):
     return (BAND_ORDER.index(band) if band in BAND_ORDER else 99, path)
 
 
-def render(files, ra, dec, out=None, show=True):
+def render(files, ra, dec, out=None, show=True, pub=False, journal="aanda"):
     """Draw the collage for `files` at position (ra, dec).
 
-    `out` writes a PNG; `show` opens an interactive window. Both default
-    off/None when called from euclid-cutouts, which picks one itself.
+    `out` writes a PNG; `show` opens an interactive window. With `pub`
+    the figure is laid out at the journal's column width and saved as a
+    vector PDF (editable text, rasterized image data) plus a 300-dpi PNG.
     """
     files = sorted((str(f) for f in files), key=band_sort_key)
     target = SkyCoord(ra=ra, dec=dec, unit=(u.deg, u.deg), frame="icrs")
 
     grid = 2 if len(files) > 1 else 1
-    fig = plt.figure(figsize=(5 * grid, 5 * grid))
+    if pub:
+        single, double = _apply_pub_style(journal)
+        width = (double if grid == 2 else single) / 25.4
+        fig = plt.figure(figsize=(width, width), layout="constrained")
+    else:
+        fig = plt.figure(figsize=(5 * grid, 5 * grid))
     for i, fname in enumerate(files[:4]):
         with fits.open(fname) as hdul:
             data = hdul[0].data
@@ -266,8 +309,14 @@ def render(files, ra, dec, out=None, show=True):
         norm = ImageNormalize(
             data, interval=ZScaleInterval(), stretch=LinearStretch()
         )
-        ax.imshow(data, origin="lower", cmap="gray", norm=norm,
-                  interpolation="none")
+        ax.imshow(
+            data,
+            origin="lower",
+            cmap="gray",
+            norm=norm,
+            interpolation="none",
+            rasterized=pub,
+        )
         scales = proj_plane_pixel_scales(wcs) * 3600.0
         add_compass(ax, wcs, data.shape)
         add_scalebar(
@@ -275,8 +324,13 @@ def render(files, ra, dec, out=None, show=True):
             data.shape, native_as=NATIVE_SCALE.get(band),
         )
         x0, y0 = wcs.world_to_pixel(target)
-        add_zoom_inset(ax, data, x0, y0, norm, scales)
-        ax.coords.grid(True, color="cyan", alpha=0.3, ls=":")
+        add_zoom_inset(ax, data, x0, y0, norm, scales, rasterized=pub)
+        if pub:
+            ax.coords.grid(
+                True, color="white", alpha=0.4, ls=":", lw=0.5
+            )
+        else:
+            ax.coords.grid(True, color="cyan", alpha=0.3, ls=":")
         for axis in ("ra", "dec"):
             ax.coords[axis].set_axislabel(
                 "RA" if axis == "ra" else "Dec", fontsize=10
@@ -314,8 +368,18 @@ def render(files, ra, dec, out=None, show=True):
             va="bottom",
         )
 
-    fig.tight_layout()
+    if pub:
+        pass  # constrained layout is already set
+    else:
+        fig.tight_layout()
     if out is not None:
+        out = Path(out)
+        if pub:
+            pdf = out if out.suffix == ".pdf" else out.with_suffix(".pdf")
+            fig.savefig(pdf, dpi=300)
+            if pdf != out:
+                fig.savefig(out, dpi=300)
+            return pdf
         fig.savefig(out, dpi=200)
         return Path(out)
     if show:
@@ -325,10 +389,12 @@ def render(files, ra, dec, out=None, show=True):
 
 
 def main():
-    ra, dec = float(sys.argv[1]), float(sys.argv[2])
-    out = Path(sys.argv[3])
-    render(sys.argv[4:], ra, dec, out=out)
-    tp.ok(f"saved {out}")
+    pub = "--pub" in sys.argv
+    argv = [a for a in sys.argv[1:] if a != "--pub"]
+    ra, dec = float(argv[0]), float(argv[1])
+    out = Path(argv[2])
+    saved = render(argv[3:], ra, dec, out=out, pub=pub)
+    tp.ok(f"saved {saved}")
 
 
 if __name__ == "__main__":
