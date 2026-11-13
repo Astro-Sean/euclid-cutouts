@@ -22,6 +22,7 @@ try:
     from PySide6.QtWidgets import (
         QAbstractItemView,
         QApplication,
+        QButtonGroup,
         QCheckBox,
         QComboBox,
         QFileDialog,
@@ -42,6 +43,7 @@ except ImportError:
         from PyQt6.QtWidgets import (
             QAbstractItemView,
             QApplication,
+            QButtonGroup,
             QCheckBox,
             QComboBox,
             QFileDialog,
@@ -208,7 +210,7 @@ class FitsViewer(QMainWindow):
         counts, edges = np.histogram(
             finite, bins=200, range=(hmin, hmax)
         )
-        lo, hi = preset_cuts(finite, "zscale")
+        lo, hi = preset_cuts(finite, "99.5%")
         return {
             "path": str(path),
             "name": Path(path).name,
@@ -226,7 +228,7 @@ class FitsViewer(QMainWindow):
             "sx": float(sxy[0]),  # deg/pix, for linked views
             "sy": float(sxy[1]),
             "stretch": "zscale",
-            "preset": "zscale",
+            "preset": "99.5%",
             "cmap": "gray",
             "invert": False,
             "ax": None,
@@ -351,12 +353,27 @@ class FitsViewer(QMainWindow):
         mbox.addWidget(self.mark_slider)
         crow = QHBoxLayout()
         crow.addWidget(QLabel("colour"))
-        self.color_combo = QComboBox()
-        self.color_combo.addItems(
-            ["red", "cyan", "green", "yellow", "magenta", "white"]
-        )
-        self.color_combo.currentTextChanged.connect(self._mark_colour)
-        crow.addWidget(self.color_combo)
+        self.color_group = QButtonGroup(self)
+        for name in (
+            "red", "cyan", "green", "yellow", "magenta", "white"
+        ):
+            btn = QPushButton()
+            btn.setCheckable(True)
+            btn.setFixedSize(22, 22)
+            btn.setToolTip(name)
+            btn.setStyleSheet(
+                f"QPushButton {{background-color: {name};"
+                " border: 1px solid #666; border-radius: 3px;}"
+                "QPushButton:checked {border: 2px solid #222;}"
+            )
+            btn.clicked.connect(
+                lambda _checked, n=name: self._mark_colour(n)
+            )
+            self.color_group.addButton(btn)
+            crow.addWidget(btn)
+            if name == self._mark_color:
+                btn.setChecked(True)
+        crow.addStretch(1)
         mbox.addLayout(crow)
         box.addWidget(marker)
         save_btn = QPushButton("Save figure")
