@@ -102,7 +102,7 @@ def nice_scale_arcsec(field_as):
     return 0.5
 
 
-def add_scalebar(ax, arcsec, scale_as, shape, color="yellow"):
+def add_scalebar(ax, arcsec, scale_as, shape, color="yellow", native_as=None):
     """Horizontal scale bar, bottom-left, above the product label."""
     ny, nx = shape
     sx, sy = scale_as
@@ -123,6 +123,8 @@ def add_scalebar(ax, arcsec, scale_as, shape, color="yellow"):
     px_label = (
         f'{sx:.2f}"/px' if np.isclose(sx, sy) else f'{sx:.2f}x{sy:.2f}"/px'
     )
+    if native_as is not None and not np.isclose(sx, native_as, rtol=0.1):
+        px_label += f" ({native_as:.2f} native)"
     ax.text(
         x0 + bar / 2,
         y0 - 0.02 * ny,
@@ -208,6 +210,19 @@ BAND_LABELS = {
     "H": "H (1.522-2.021 \u00b5m)",
 }
 
+# Native detector pixel scale in arcsec. MER resamples NISP mosaics onto
+# the VIS 0.1 arcsec grid, so a file can carry a finer scale than its
+# detector; the label notes the native value when they differ.
+NATIVE_SCALE = {
+    "VIS": 0.1,
+    "NIR_Y": 0.3,
+    "NIR_J": 0.3,
+    "NIR_H": 0.3,
+    "Y": 0.3,
+    "J": 0.3,
+    "H": 0.3,
+}
+
 
 def band_sort_key(path):
     hdr = fits.getheader(path)
@@ -257,7 +272,7 @@ def render(files, ra, dec, out=None, show=True):
         add_compass(ax, wcs, data.shape)
         add_scalebar(
             ax, nice_scale_arcsec(data.shape[1] * scales[0]), scales,
-            data.shape,
+            data.shape, native_as=NATIVE_SCALE.get(band),
         )
         x0, y0 = wcs.world_to_pixel(target)
         add_zoom_inset(ax, data, x0, y0, norm, scales)
