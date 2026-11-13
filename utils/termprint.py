@@ -107,6 +107,26 @@ def die(msg, code=1):
     raise SystemExit(code)
 
 
+def ask(msg, default=False):
+    """Yes/no prompt as a [warn] line. Enter takes `default`.
+
+    Non-interactive stdin returns `default` without prompting.
+    KeyboardInterrupt propagates so callers keep their exit path.
+    """
+    suffix = "[Y/n]" if default else "[y/N]"
+    if not (hasattr(sys.stdin, "isatty") and sys.stdin.isatty()):
+        return default
+    try:
+        reply = input(f"{_tag(_WARN, 'warn', sys.stdout)} {msg} {suffix} ")
+    except EOFError:
+        print()
+        return default
+    yes = reply.strip().lower()
+    if not yes:
+        return default
+    return yes in ("y", "yes")
+
+
 def gap():
     """One blank line between logical blocks; no-op at start of output."""
     if _emitted:
@@ -248,6 +268,7 @@ class timed:
 
 
 __all__ = [
-    "ok", "warn", "fail", "info", "die", "header", "subheader", "rule", "gap",
-    "kv", "table", "box", "progress", "timed", "supports_color", "WIDTH",
+    "ok", "warn", "fail", "info", "die", "ask", "header", "subheader",
+    "rule", "gap", "kv", "table", "box", "progress", "timed",
+    "supports_color", "WIDTH",
 ]
