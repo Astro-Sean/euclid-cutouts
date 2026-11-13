@@ -516,6 +516,7 @@ class FitsViewer(QMainWindow):
 
     def _draw(self):
         self.fig.clf()
+        self._mark_lines = []  # clf() took the old artists with it
         for p in self.panels:
             p["ax"] = p["im"] = None
         visible = self._visible()
@@ -672,7 +673,9 @@ class FitsViewer(QMainWindow):
         for line in self._mark_lines:
             try:
                 line.remove()
-            except ValueError:
+            # ValueError: not on an axes; NotImplementedError: axes
+            # already destroyed by a figure rebuild
+            except (ValueError, NotImplementedError):
                 pass
         self._mark_lines = []
         if self._mark is not None:
